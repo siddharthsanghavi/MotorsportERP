@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MotorsportERP - FSAE Operations</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>One workspace for parts, purchasing, manufacturing, budgets, and design sign-off.</p></div>
+        <div class="hero-actions"><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <button class="tab active" data-view="overview"><span>Overview</span><small>Team pulse</small></button>
+        <button class="tab" data-view="parts"><span>Parts & Inventory</span><small>Track assets</small></button>
+        <button class="tab" data-view="purchasing"><span>Purchasing</span><small>Vendors & requests</small></button>
+        <button class="tab" data-view="machine-shop"><span>Machine Shop</span><small>Manufacturing queue</small></button>
+        <button class="tab" data-view="budget"><span>Budget</span><small>Spend control</small></button>
+        <button class="tab" data-view="approvals"><span>Approvals</span><small>Design sign-off</small></button>
+      </nav>
+
+      <section id="overview" class="view active">
+        <div class="stats" id="stats"></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">WORK QUEUE</p><h2>Recent activity</h2></div><button class="secondary" data-go="purchasing">Add purchase request</button></div><div id="activity" class="activity"></div></div>
+      </section>
+
+      <section id="parts" class="view">
+        <div class="card"><p class="eyebrow">INVENTORY</p><h2>Track a part</h2>
+          <form id="part-form" class="form-grid">
+            <label>Part name<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option><option>Other</option></select></label>
+            <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label><label>Location<input name="location" placeholder="Car / Shop / Storage" required /></label><label>Status<select name="status"><option>In Design</option><option>Manufacturing</option><option>In Inventory</option><option>Installed</option><option>Damaged</option></select></label><button>Add part</button>
+          </form>
+        </div>
+        <div class="card"><div class="list-header"><h2>Parts & inventory</h2><input id="part-search" type="search" placeholder="Search parts" /></div><div class="table-wrap"><table><thead><tr><th>Part</th><th>Subsystem</th><th>Qty</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="parts-body"></tbody></table></div><p id="parts-empty" class="empty">No parts tracked yet.</p></div>
+      </section>
+
+      <section id="purchasing" class="view">
+        <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>Vendor & purchase request</h2>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Request status<select name="status"><option>Requested</option><option>Quoted</option><option>Approved</option><option>Ordered</option><option>Received</option></select></label><button>Save request</button></form>
+        </div>
+        <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
+      </section>
+
+      <section id="machine-shop" class="view">
+        <div class="card"><p class="eyebrow">MANUFACTURING</p><h2>Machine shop job</h2>
+          <form id="job-form" class="form-grid"><label>Job / part<input name="name" required /></label><label>Owner<input name="owner" required /></label><label>Material<input name="material" placeholder="7075-T6, steel..." required /></label><label>Due date<input name="dueDate" type="date" required /></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Critical</option></select></label><button>Queue job</button></form>
+        </div>
+        <div class="card"><h2>Shop queue</h2><div class="table-wrap"><table><thead><tr><th>Job</th><th>Owner</th><th>Material</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead><tbody id="jobs-body"></tbody></table></div><p id="jobs-empty" class="empty">No machine shop jobs queued.</p></div>
+      </section>
+
+      <section id="budget" class="view">
+        <div class="card"><p class="eyebrow">FINANCE</p><h2>Budget allocation</h2>
+          <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><label>Spent ($)<input name="spent" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
+        </div>
+        <div class="card"><h2>Budget overview</h2><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
+      </section>
+
+      <section id="approvals" class="view">
+        <div class="card"><p class="eyebrow">ENGINEERING GOVERNANCE</p><h2>Submit a design for approval</h2>
+          <form id="approval-form" class="form-grid"><label>Design / document<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option></select></label><label>Reviewer<input name="reviewer" required /></label><label>Revision<input name="revision" placeholder="Rev A" required /></label><button>Submit for review</button></form>
+        </div>
+        <div class="card"><h2>Approval board</h2><div class="table-wrap"><table><thead><tr><th>Design</th><th>Subsystem</th><th>Revision</th><th>Reviewer</th><th>Status</th><th></th></tr></thead><tbody id="approvals-body"></tbody></table></div><p id="approvals-empty" class="empty">No designs awaiting review.</p></div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
