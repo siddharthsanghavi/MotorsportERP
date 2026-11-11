@@ -13,3 +13,4 @@ Open `index.html` in a browser (or serve the folder with any static file server)
 - Budget tracker: record category allocations and see spend remaining/progress
 - Design approvals: submit revisions for review and advance approval status
 - Overview dashboard with counts and recent activity
+- Demo controls: load realistic records across every module or clear the local workspace

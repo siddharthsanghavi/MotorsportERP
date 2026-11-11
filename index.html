@@ -10,16 +10,16 @@
     <main class="container">
       <header class="hero">
         <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>One workspace for parts, purchasing, manufacturing, budgets, and design sign-off.</p></div>
-        <div class="hero-badge">2026 Season</div>
+        <div class="hero-actions"><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button></div>
       </header>
 
       <nav class="tabs" aria-label="Main navigation">
-        <button class="tab active" data-view="overview">Overview</button>
-        <button class="tab" data-view="parts">Parts & Inventory</button>
-        <button class="tab" data-view="purchasing">Purchasing & Vendors</button>
-        <button class="tab" data-view="machine-shop">Machine Shop</button>
-        <button class="tab" data-view="budget">Budget Tracker</button>
-        <button class="tab" data-view="approvals">Design Approvals</button>
+        <button class="tab active" data-view="overview"><span>Overview</span><small>Team pulse</small></button>
+        <button class="tab" data-view="parts"><span>Parts & Inventory</span><small>Track assets</small></button>
+        <button class="tab" data-view="purchasing"><span>Purchasing</span><small>Vendors & requests</small></button>
+        <button class="tab" data-view="machine-shop"><span>Machine Shop</span><small>Manufacturing queue</small></button>
+        <button class="tab" data-view="budget"><span>Budget</span><small>Spend control</small></button>
+        <button class="tab" data-view="approvals"><span>Approvals</span><small>Design sign-off</small></button>
       </nav>
 
       <section id="overview" class="view active">

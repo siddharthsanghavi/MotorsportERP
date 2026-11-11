@@ -6,6 +6,35 @@ const id = () => crypto.randomUUID();
 const formValues = (form) => Object.fromEntries(new FormData(form).entries());
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+const demoData = {
+  parts: [
+    { name: "Accumulator enclosure", subsystem: "Powertrain", quantity: "1", location: "Car", status: "Installed" },
+    { name: "Front upright LH", subsystem: "Suspension", quantity: "2", location: "Inventory", status: "In Inventory" },
+    { name: "Brake pedal assembly", subsystem: "Brakes", quantity: "1", location: "Machine Shop", status: "Manufacturing" },
+    { name: "CAN node board", subsystem: "Electronics", quantity: "4", location: "Electronics Lab", status: "In Design" }
+  ],
+  purchases: [
+    { item: "7075-T6 plate, 12 mm", vendor: "Online Metals", amount: "486.5", neededBy: "2026-11-28", status: "Ordered" },
+    { item: "M8 titanium fastener kit", vendor: "Fastenal", amount: "218.75", neededBy: "2026-11-20", status: "Quoted" },
+    { item: "High-voltage gloves", vendor: "McMaster-Carr", amount: "96", neededBy: "2026-12-05", status: "Requested" }
+  ],
+  jobs: [
+    { name: "Rear rocker set", owner: "Maya Chen", material: "7075-T6", dueDate: "2026-11-23", priority: "High", status: "In Progress" },
+    { name: "Steering shaft spacer", owner: "Noah Williams", material: "4140 steel", dueDate: "2026-11-19", priority: "Normal", status: "Queued" },
+    { name: "Brake caliper bracket", owner: "Ava Patel", material: "6061-T6", dueDate: "2026-11-15", priority: "Critical", status: "Quality Check" }
+  ],
+  budgets: [
+    { category: "Powertrain", budget: "12000", spent: "8460" },
+    { category: "Suspension", budget: "8500", spent: "5125" },
+    { category: "Electrical", budget: "6500", spent: "5980" },
+    { category: "Safety equipment", budget: "3000", spent: "1240" }
+  ],
+  approvals: [
+    { name: "Accumulator enclosure drawing", subsystem: "Powertrain", reviewer: "Dr. Kim", revision: "Rev C", status: "Pending Review" },
+    { name: "Front suspension FEA report", subsystem: "Suspension", reviewer: "Jordan Lee", revision: "Rev B", status: "Changes Requested" },
+    { name: "Shutdown circuit schematic", subsystem: "Electronics", reviewer: "Dr. Kim", revision: "Rev A", status: "Approved" }
+  ]
+};
 
 function showView(view) {
   document.querySelectorAll(".view").forEach((section) => section.classList.toggle("active", section.id === view));
@@ -13,6 +42,17 @@ function showView(view) {
 }
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
 document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
+const withMetadata = (rows) => rows.map((row) => ({ ...row, id: id(), createdAt: new Date().toISOString() }));
+function loadDemoData() {
+  Object.entries(demoData).forEach(([key, rows]) => write(key, withMetadata(rows)));
+  renderAll();
+}
+function clearWorkspace() {
+  Object.keys(KEYS).forEach((key) => localStorage.removeItem(KEYS[key]));
+  renderAll();
+}
+$("#seed-data").addEventListener("click", loadDemoData);
+$("#clear-data").addEventListener("click", clearWorkspace);
 
 function renderParts() {
   const query = ($("#part-search")?.value || "").trim().toLowerCase();
