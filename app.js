@@ -1,4 +1,4 @@
-const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchases", jobs: "motorsport-erp-jobs", budgets: "motorsport-erp-budgets", approvals: "motorsport-erp-approvals", team: "motorsport-erp-team", log: "motorsport-erp-log", me: "motorsport-erp-current-user" };
+const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchases", jobs: "motorsport-erp-jobs", budgets: "motorsport-erp-budgets", approvals: "motorsport-erp-approvals", team: "motorsport-erp-team", projects: "motorsport-erp-projects", tasks: "motorsport-erp-tasks", log: "motorsport-erp-log", me: "motorsport-erp-current-user" };
 const $ = (selector) => document.querySelector(selector);
 const read = (key) => { try { return JSON.parse(localStorage.getItem(KEYS[key])) || []; } catch { return []; } };
 const write = (key, value) => localStorage.setItem(KEYS[key], JSON.stringify(value));
@@ -40,6 +40,11 @@ const TITLES = ["President", "Vice President", "Chief Mechanic", "Business Lead"
 const leads = (subsystem, user = me()) => user.roles.includes("Admin") || (user.roles.includes("Subteam Lead") && (user.subsystem === subsystem || (user.leads || []).some((t) => SUBTEAMS[t]?.subsystem === subsystem)));
 const own = (row, user = me()) => row.createdBy && row.createdBy === user.id;
 
+const isLeader = (u) => u.roles.includes("Admin") || ["President", "Vice President", "Chief Mechanic"].includes(u.title);
+const ledSub = (subteam, u = me()) => !!subteam && (u.leads || []).includes(subteam);
+const projectOf = (task) => task && read("projects").find((p) => p.id === task.projectId);
+const onProject = (p, u = me()) => p.pocId === u.id || p.createdBy === u.id || (p.assignees || []).includes(u.id);
+
 function can(action, key, row) {
   const u = me();
   if (!u.id) return false;
@@ -54,6 +59,24 @@ function can(action, key, row) {
     case "advance:jobs": case "delete:jobs": return has("Shop Lead");
     case "advance:approvals": return has("Design Review Approver") && (isAdmin || !own(row));
     case "delete:approvals": return leads(row?.subsystem) || (own(row) && row.status === "Pending Review");
+    // Projects: anyone proposes; leadership or the subteam's lead approves (not their own); owner/lead/leadership run it.
+    case "create:projects": return true;
+    case "advance:projects": {
+      if (!row) return isLeader(u) || (u.leads || []).length > 0;
+      if (row.status === "Complete") return false;
+      if (row.status === "Rejected") return own(row) || isLeader(u);
+      if (row.status === "Proposed") return (isLeader(u) || ledSub(row.subteam, u)) && (isAdmin || !own(row));
+      return row.pocId === u.id || ledSub(row.subteam, u) || isLeader(u);
+    }
+    // The POC is picked by the subteam lead (or leadership); the POC can also adjust who is assigned.
+    case "assignPoc:projects": return !!row && row.status !== "Rejected" && (ledSub(row.subteam, u) || isLeader(u));
+    case "assign:projects": return !!row && row.status !== "Rejected" && (row.pocId === u.id || ledSub(row.subteam, u) || isLeader(u));
+    case "reject:projects": return row?.status === "Proposed" && can("advance", "projects", row);
+    case "delete:projects": return isLeader(u) || ledSub(row?.subteam, u) || (row && own(row) && ["Proposed", "Rejected"].includes(row.status));
+    // Tasks: the project's people add them; assignee or project owner/lead moves them.
+    case "create:tasks": return !!row && (onProject(row, u) || ledSub(row.subteam, u) || isLeader(u));
+    case "advance:tasks": { const p = projectOf(row); return !!p && (row.assigneeId === u.id || p.pocId === u.id || ledSub(p.subteam, u) || isLeader(u)); }
+    case "delete:tasks": { const p = projectOf(row); return !!p && (p.pocId === u.id || ledSub(p.subteam, u) || isLeader(u)); }
     case "manage:team": return isAdmin;
     default: return false;
   }
@@ -193,10 +216,40 @@ function loadDemoData() {
   write("team", team);
   const idByName = Object.fromEntries(team.map((m) => [m.name, m.id]));
   Object.entries(demoData).forEach(([key, rows]) => write(key, rows.map(({ by, ...row }) => ({ ...row, id: id(), createdAt: new Date().toISOString(), createdBy: idByName[by] || "" }))));
+  seedProjects(team);
   localStorage.setItem(KEYS.me, team[0].id);
   write("log", []);
   logEvent("loaded demo data");
   renderAll();
+}
+// Demo projects: people come from each project's subteam so assignments look realistic.
+function seedProjects(team) {
+  // [name, subteam, status, est. cost, target, summary, hasPoc, tasks: [title, status, due]]
+  const demo = [
+    ["Lightweight front upright", "Suspension", "In Progress", 640, "2027-01-20", "Topology-optimised 7075 upright to cut 180 g of unsprung mass per corner.", true,
+      [["FEA load cases from VD", "Done", "2026-11-10"], ["Topology optimisation run", "Done", "2026-11-18"], ["Machining drawings", "In Progress", "2026-11-28"], ["CAM + fixture plan", "To Do", "2026-12-05"], ["Bearing press-fit test", "To Do", "2026-12-15"]]],
+    ["Accumulator cooling redesign", "EV Powertrain", "Review", 1200, "2026-12-15", "Ducted airflow through the segments to keep cells under 55 °C in endurance.", true,
+      [["CFD of duct inlet", "Done", "2026-10-30"], ["Thermal test on one segment", "Done", "2026-11-12"], ["Fan control logic", "Done", "2026-11-14"], ["Design review packet", "In Progress", "2026-11-20"]]],
+    ["CAN telemetry dashboard", "Low Voltage", "Approved", 150, "2027-02-01", "Live pit-side view of CAN data over the radio link.", false, []],
+    ["Carbon steering wheel", "Composites", "Proposed", 380, "2027-02-15", "Pre-preg wheel shell around the existing quick release; saves ~300 g.", false, []],
+    ["Restrictor CFD study", "Combustion", "Proposed", 0, "2026-12-20", "Compare three converging-diverging profiles before machining a new restrictor.", false, []],
+    ["Sponsor outreach packet", "Business", "In Progress", 90, "2026-12-01", "Updated deck and tier sheet for the spring sponsorship push.", true,
+      [["Collect season photos", "Done", "2026-11-05"], ["Draft tier sheet", "Blocked", "2026-11-19"], ["Design deck", "To Do", "2026-11-26"]]],
+    ["Differential mount v2", "Driveline", "Complete", 210, "2026-10-15", "Stiffer eccentric mounts for chain tensioning.", true,
+      [["Redesign eccentric", "Done", "2026-09-20"], ["Machine mounts", "Done", "2026-10-02"], ["Fit check on car", "Done", "2026-10-10"]]],
+    ["Active aero DRS flap", "Aerodynamics", "Rejected", 2400, "2027-03-01", "Driver-actuated rear wing flap. Rejected: outside budget this season.", false, []]
+  ];
+  const projects = []; const tasks = [];
+  demo.forEach(([name, subteam, status, estCost, targetDate, summary, hasPoc, taskList], i) => {
+    const lead = team.find((m) => (m.leads || []).includes(subteam));
+    const members = team.filter((m) => (m.subteams || []).includes(subteam) && !(m.leads || []).includes(subteam));
+    const assignees = members.slice(0, 2 + (i % 3)).map((m) => m.id);
+    const proposer = members[members.length - 1] || lead;
+    const pid = id();
+    projects.push({ id: pid, name, subteam, status, estCost: String(estCost), targetDate, summary, assignees, pocId: hasPoc ? assignees[0] : "", createdBy: proposer.id, createdAt: new Date().toISOString(), approvedBy: !["Proposed", "Rejected"].includes(status) ? lead.id : "" });
+    taskList.forEach(([title, tStatus, dueDate], k) => tasks.push({ id: id(), projectId: pid, title, status: tStatus, dueDate, assigneeId: assignees[k % assignees.length], createdBy: assignees[0], createdAt: new Date().toISOString() }));
+  });
+  write("projects", projects); write("tasks", tasks);
 }
 function clearWorkspace() {
   Object.values(KEYS).forEach((key) => localStorage.removeItem(key));
@@ -264,7 +317,11 @@ function renderTeam() {
 function renderOverview() {
   const purchases = read("purchases"); const jobs = read("jobs"); const approvals = read("approvals"); const parts = read("parts"); const u = me();
   $("#stats").innerHTML = [["Parts tracked", parts.length, "parts"], ["Open purchases", purchases.filter((x) => x.status !== "Received").length, "requests"], ["Shop queue", jobs.filter((x) => x.status !== "Complete").length, "jobs"], ["Pending approvals", approvals.filter((x) => x.status !== "Approved").length, "reviews"]].map(([label, value, suffix]) => `<div class="stat"><span>${label}</span><strong>${value}</strong><small>${suffix}</small></div>`).join("");
+  const projects = read("projects"); const projName = (pid) => projects.find((p) => p.id === pid)?.name || "?";
   const inbox = [
+    ...projects.filter((p) => p.status === "Proposed" && can("advance", "projects", p)).map((p) => `Project proposal: ${p.name} (${p.subteam}) needs approval`),
+    ...projects.filter((p) => !p.pocId && !["Proposed", "Rejected", "Complete"].includes(p.status) && can("assignPoc", "projects", p)).map((p) => `Project: ${p.name} needs a POC`),
+    ...read("tasks").filter((t) => t.assigneeId === u.id && t.status !== "Done").map((t) => `Task: ${t.title} (${projName(t.projectId)}) is ${t.status}${t.dueDate ? `, due ${t.dueDate}` : ""}`),
     ...purchases.filter((p) => p.status !== "Received" && can("advance", "purchases", p)).map((p) => `Purchase: ${p.item} (${money(p.amount)}) is ${p.status}`),
     ...approvals.filter((a) => a.status !== "Approved" && can("advance", "approvals", a)).map((a) => `Design review: ${a.name} ${a.revision} is ${a.status}`),
     ...jobs.filter((j) => j.status !== "Complete" && can("advance", "jobs", j)).map((j) => `Shop job: ${j.name} is ${j.status}`)
@@ -349,13 +406,96 @@ function renderVenn() {
 document.querySelectorAll("#tree-filter button").forEach((b) => b.addEventListener("click", () => { treePlatform = b.dataset.platform; document.querySelectorAll("#tree-filter button").forEach((x) => x.classList.toggle("active", x === b)); renderTree(); renderFlow(); }));
 document.querySelectorAll("#mode-toggle button").forEach((b) => b.addEventListener("click", () => { assemblyMode = b.dataset.mode; document.querySelectorAll("#mode-toggle button").forEach((x) => x.classList.toggle("active", x === b)); renderAssemblyMode(); }));
 
+// ---------- Projects & tasks ----------
+// Lifecycle: Proposed → Approved → In Progress → Review → Complete (or Rejected at the proposal stage).
+// Several people can be assigned; one of them is the POC, picked by the subteam lead (or leadership).
+let projectFilter = "Active"; let projectMineOnly = false;
+const stageClass = (s) => s.toLowerCase().replace(/\s+/g, "-");
+const memberOpts = (ids, selected = "", blank = "") => {
+  const team = read("team"); const first = ids.map((i) => team.find((m) => m.id === i)).filter(Boolean);
+  const rest = team.filter((m) => !ids.includes(m.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const opt = (m) => `<option value="${m.id}" ${m.id === selected ? "selected" : ""}>${esc(m.name)}</option>`;
+  return (blank ? `<option value="">${esc(blank)}</option>` : "") + (first.length ? `<optgroup label="On this project">${first.map(opt).join("")}</optgroup><optgroup label="Everyone else">${rest.map(opt).join("")}</optgroup>` : rest.map(opt).join(""));
+};
+function renderProjectForm() {
+  const sub = $("#project-subteam"); const cur = sub.value;
+  sub.innerHTML = `<option value="">Select</option>` + Object.keys(SUBTEAMS).map((t) => `<option ${t === cur ? "selected" : ""}>${esc(t)}</option>`).join("");
+  const people = $("#project-assignees"); const chosen = [...people.selectedOptions].map((o) => o.value);
+  people.innerHTML = [...read("team")].sort((a, b) => a.name.localeCompare(b.name)).map((m) => `<option value="${m.id}" ${chosen.includes(m.id) ? "selected" : ""}>${esc(m.name)}${(m.subteams || []).length ? ` · ${esc(m.subteams.join(", "))}` : ""}</option>`).join("");
+}
+function renderProjects() {
+  const projects = read("projects"); const tasks = read("tasks"); const u = me();
+  const shown = projects.filter((p) => {
+    const f = projectFilter;
+    const stageOk = f === "All" || (f === "Active" ? !["Complete", "Rejected"].includes(p.status) : p.status === f);
+    return stageOk && (!projectMineOnly || onProject(p, u) || tasks.some((t) => t.projectId === p.id && t.assigneeId === u.id));
+  });
+  $("#project-counts").innerHTML = ["Proposed", "Approved", "In Progress", "Review", "Complete", "Rejected"].map((s) => `<span class="count-chip ${stageClass(s)}">${s} <b>${projects.filter((p) => p.status === s).length}</b></span>`).join("");
+  $("#projects-list").innerHTML = shown.map((p) => {
+    const pt = tasks.filter((t) => t.projectId === p.id); const done = pt.filter((t) => t.status === "Done").length; const pct = pt.length ? Math.round(done / pt.length * 100) : 0;
+    const canAssign = can("assign", "projects", p);
+    const people = (p.assignees || []).map((a) => `<span class="person-chip${a === p.pocId ? " poc" : ""}">${a === p.pocId ? "POC · " : ""}${esc(memberName(a))}${canAssign && a !== p.pocId ? `<button class="x" data-action="unassign" data-key="projects" data-id="${p.id}" data-member="${a}" title="Remove from project">×</button>` : ""}</span>`).join(" ") || `<span class="hint">Nobody yet</span>`;
+    const btns = [];
+    if (p.status === "Proposed" && can("advance", "projects", p)) btns.push(`<button class="small" data-action="advance" data-key="projects" data-id="${p.id}">Approve</button><button class="small secondary" data-action="reject" data-key="projects" data-id="${p.id}">Reject</button>`);
+    else if (p.status === "Proposed") btns.push(`<span class="hint">Awaiting approval from the ${esc(p.subteam)} lead or leadership</span>`);
+    else if (p.status === "Rejected" && can("advance", "projects", p)) btns.push(`<button class="small secondary" data-action="advance" data-key="projects" data-id="${p.id}">Resubmit</button>`);
+    else if (can("advance", "projects", p)) btns.push(`<button class="small" data-action="advance" data-key="projects" data-id="${p.id}">Move to ${next.projects[next.projects.indexOf(p.status) + 1]}</button>`);
+    if (can("delete", "projects", p)) btns.push(`<button class="link danger" data-action="delete" data-key="projects" data-id="${p.id}">Delete</button>`);
+    const pocCtl = can("assignPoc", "projects", p) ? `<label class="inline small">POC <select data-poc="${p.id}">${memberOpts(p.assignees || [], p.pocId || "", "— Not set —")}</select></label>` : "";
+    const addCtl = canAssign ? `<label class="inline small">Assign <select data-assign="${p.id}">${memberOpts([], "", "Add a person…")}</select></label>` : "";
+    const taskRows = pt.map((t) => `<tr><td>${esc(t.title)}</td><td>${esc(memberName(t.assigneeId))}</td><td>${esc(t.dueDate || "—")}</td><td><span class="status task-${stageClass(t.status)}">${esc(t.status)}</span></td><td>${can("advance", "tasks", t) ? `<button class="link" data-action="advance" data-key="tasks" data-id="${t.id}">Advance</button>` : ""}${can("delete", "tasks", t) ? `<button class="link danger" data-action="delete" data-key="tasks" data-id="${t.id}">Delete</button>` : ""}</td></tr>`).join("");
+    const taskForm = can("create", "tasks", p) && !["Rejected", "Complete"].includes(p.status) ? `<form class="task-form" data-project="${p.id}"><input name="title" placeholder="New task" required /><select name="assigneeId" required>${memberOpts(p.assignees || [], "", "Assign to…")}</select><input name="dueDate" type="date" /><button class="small">Add task</button></form>` : "";
+    return `<article class="project stage-${stageClass(p.status)}">
+      <header><div><h3>${esc(p.name)}</h3><div class="meta"><span class="team-tag">${esc(p.subteam)}</span><span>Proposed by ${esc(memberName(p.createdBy))}</span>${p.estCost ? `<span>${money(p.estCost)} est.</span>` : ""}${p.targetDate ? `<span>Target ${esc(p.targetDate)}</span>` : ""}</div></div><span class="stage-chip ${stageClass(p.status)}">${esc(p.status)}</span></header>
+      ${p.summary ? `<p class="summary">${esc(p.summary)}</p>` : ""}
+      <div class="people"><span class="label">Team</span>${people}${p.pocId ? "" : `<span class="warn-chip">No POC yet</span>`}</div>
+      ${pocCtl || addCtl ? `<div class="assign-row">${pocCtl}${addCtl}</div>` : ""}
+      <div class="progress-row"><div class="progress"><i style="width:${pct}%"></i></div><span>${done}/${pt.length} tasks · ${pct}%</span></div>
+      <details ${pt.length && pt.length <= 6 && p.status !== "Proposed" ? "open" : ""}><summary>Tasks (${pt.length})</summary>${pt.length ? `<div class="table-wrap"><table class="compact"><thead><tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${taskRows}</tbody></table></div>` : `<p class="hint">No tasks yet.</p>`}${taskForm}</details>
+      <footer>${btns.join("")}</footer></article>`;
+  }).join("");
+  $("#projects-empty").style.display = shown.length ? "none" : "block";
+}
+document.querySelectorAll("#project-filter button").forEach((b) => b.addEventListener("click", () => { projectFilter = b.dataset.filter; document.querySelectorAll("#project-filter button").forEach((x) => x.classList.toggle("active", x === b)); renderProjects(); }));
+$("#project-mine").addEventListener("change", (e) => { projectMineOnly = e.target.checked; renderProjects(); });
+document.addEventListener("change", (e) => {
+  const poc = e.target.closest("[data-poc]"); const add = e.target.closest("[data-assign]");
+  if (!poc && !add) return;
+  const projects = read("projects"); const p = projects.find((x) => x.id === (poc ? poc.dataset.poc : add.dataset.assign)); if (!p) return;
+  if (poc) {
+    if (!can("assignPoc", "projects", p)) return flash("Only the subteam lead or leadership can set the POC.");
+    p.pocId = poc.value; if (p.pocId && !(p.assignees || []).includes(p.pocId)) p.assignees = [...(p.assignees || []), p.pocId];
+    logEvent(p.pocId ? `made ${memberName(p.pocId)} POC of "${p.name}"` : `cleared the POC of "${p.name}"`);
+  } else {
+    if (!add.value || !can("assign", "projects", p)) return;
+    p.assignees = [...new Set([...(p.assignees || []), add.value])]; logEvent(`assigned ${memberName(add.value)} to "${p.name}"`);
+  }
+  write("projects", projects); renderAll();
+});
+document.addEventListener("submit", (e) => {
+  const form = e.target.closest(".task-form"); if (!form) return;
+  e.preventDefault();
+  const p = read("projects").find((x) => x.id === form.dataset.project);
+  if (!can("create", "tasks", p)) return flash("Only people on this project can add tasks.");
+  const v = formValues(form);
+  write("tasks", [...read("tasks"), { id: id(), projectId: p.id, title: v.title, assigneeId: v.assigneeId, dueDate: v.dueDate, status: "To Do", createdBy: me().id, createdAt: new Date().toISOString() }]);
+  logEvent(`added task "${v.title}" to "${p.name}" for ${memberName(v.assigneeId)}`); renderAll();
+});
+$("#project-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const project = { id: id(), name: form.get("name"), subteam: form.get("subteam"), summary: form.get("summary"), estCost: form.get("estCost"), targetDate: form.get("targetDate"), assignees: form.getAll("assignees"), pocId: "", status: "Proposed", createdBy: me().id, createdAt: new Date().toISOString() };
+  write("projects", [...read("projects"), project]); logEvent(`proposed project "${project.name}" for ${project.subteam}`); e.target.reset(); renderAll();
+});
+
 // ---------- Process maps (React Flow) ----------
 // Each process: its stages in order, plus the role that moves an item out of each stage.
 const PROCESSES = {
   purchases: { view: "purchasing", label: (r) => `${r.item} · ${money(r.amount)}`, role: "Purchasing Approver", loop: null },
   approvals: { view: "approvals", label: (r) => `${r.name} ${r.revision}`, role: "Design Review Approver", loop: "next revision" },
   jobs: { view: "machine-shop", label: (r) => r.name, role: "Shop Lead", loop: "rework" },
-  parts: { view: "parts", label: (r) => r.name, role: "Anyone", loop: "rebuild" }
+  parts: { view: "parts", label: (r) => r.name, role: "Anyone", loop: "rebuild" },
+  projects: { view: "projects", label: (r) => r.name, role: ["Subteam lead / leadership", "POC or lead", "POC or lead", "POC or lead"], loop: null }
 };
 function renderProcess(key) {
   const box = $(`#process-${key}`); const cfg = PROCESSES[key];
@@ -364,7 +504,9 @@ function renderProcess(key) {
   const rows = read(key); const statuses = next[key];
   const mine = can("advance", key, { createdBy: "__nobody__", subsystem: me().subsystem });
   const stages = statuses.map((s, i) => ({ id: s, label: s, items: rows.filter((r) => r.status === s).map(cfg.label), final: i === statuses.length - 1 }));
-  const edges = statuses.slice(0, -1).map((s, i) => ({ from: s, to: statuses[i + 1], label: cfg.role, mine }));
+  // "Could I move an item out of stage s?" — tested against a stand-in item in my subteam that someone else created.
+  const sample = (s) => ({ status: s, createdBy: "__nobody__", subsystem: me().subsystem, subteam: (me().leads || [])[0] || "", pocId: "__nobody__", assignees: [] });
+  const edges = statuses.slice(0, -1).map((s, i) => ({ from: s, to: statuses[i + 1], label: Array.isArray(cfg.role) ? cfg.role[i] : cfg.role, mine: key === "projects" ? can("advance", key, sample(s)) : mine }));
   if (cfg.loop) edges.push({ from: statuses[statuses.length - 1], to: statuses[0], label: cfg.loop, mine });
   window.MotorsportFlow.renderProcess(box, { stages, edges });
 }
@@ -385,11 +527,11 @@ $("#org-focus").addEventListener("change", (e) => { orgFocus = e.target.value; r
 
 function flash(text) { const el = $("#toast"); el.textContent = text; el.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.remove("show"), 3200); }
 
-const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProcesses(); renderOrg(); };
+const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProjectForm(); renderProjects(); renderProcesses(); renderOrg(); };
 
 // ---------- Forms & actions ----------
-const labelOf = (key, row) => row.name || row.item || row.category || "item";
-const nouns = { parts: "part", purchases: "purchase request", jobs: "shop job", budgets: "budget allocation", approvals: "design review" };
+const labelOf = (key, row) => row.name || row.item || row.category || row.title || "item";
+const nouns = { parts: "part", purchases: "purchase request", jobs: "shop job", budgets: "budget allocation", approvals: "design review", projects: "project", tasks: "task" };
 const setupForm = (selector, key, defaults = {}) => $(selector).addEventListener("submit", (event) => {
   event.preventDefault();
   if (!can("create", key)) { flash("Your roles don't allow this."); return; }
@@ -414,7 +556,7 @@ $("#member-title").innerHTML = `<option value="">Member</option>` + TITLES.map((
 $("#member-roles").innerHTML = Object.keys(ROLES).filter((r) => r !== "Subteam Lead").map((r) => `<label class="check"><input type="checkbox" name="roles" value="${esc(r)}" />${esc(r)}</label>`).join("");
 $("#part-search").addEventListener("input", renderParts);
 
-const next = { parts: ["In Design", "Manufacturing", "In Inventory", "Installed", "Damaged"], purchases: ["Requested", "Quoted", "Approved", "Ordered", "Received"], jobs: ["Queued", "In Progress", "Quality Check", "Complete"], approvals: ["Pending Review", "Changes Requested", "Approved"] };
+const next = { parts: ["In Design", "Manufacturing", "In Inventory", "Installed", "Damaged"], purchases: ["Requested", "Quoted", "Approved", "Ordered", "Received"], jobs: ["Queued", "In Progress", "Quality Check", "Complete"], approvals: ["Pending Review", "Changes Requested", "Approved"], projects: ["Proposed", "Approved", "In Progress", "Review", "Complete"], tasks: ["To Do", "In Progress", "Blocked", "Done"] };
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]"); if (!button) return;
   const { action, key } = button.dataset;
@@ -424,12 +566,24 @@ document.addEventListener("click", (event) => {
     write("team", team.filter((x) => x.id !== button.dataset.id)); logEvent(`removed ${m?.name} from the team`); renderAll(); return;
   }
   const rows = read(key); const row = rows.find((r) => r.id === button.dataset.id); if (!row) return;
+  if (action === "unassign") {
+    if (!can("assign", "projects", row)) return flash("Only the POC, subteam lead or leadership can change assignments.");
+    row.assignees = (row.assignees || []).filter((m) => m !== button.dataset.member); write(key, rows); logEvent(`removed ${memberName(button.dataset.member)} from "${row.name}"`); renderAll(); return;
+  }
   if (!can(action, key, row)) { flash("Your roles don't allow this."); return; }
   if (action === "advance") {
-    const statuses = next[key]; row.status = statuses[(statuses.indexOf(row.status) + 1) % statuses.length];
-    write(key, rows); logEvent(`moved ${nouns[key]} "${labelOf(key, row)}" to ${row.status}`);
+    const statuses = next[key];
+    const from = row.status;
+    row.status = key === "projects" && from === "Rejected" ? "Proposed" : statuses[(statuses.indexOf(from) + 1) % statuses.length];
+    if (key === "projects" && from === "Proposed") { row.approvedBy = me().id; row.approvedAt = new Date().toISOString(); }
+    write(key, rows);
+    logEvent(key === "projects" && from === "Proposed" ? `approved project proposal "${labelOf(key, row)}"` : key === "projects" && from === "Rejected" ? `resubmitted project "${labelOf(key, row)}"` : `moved ${nouns[key]} "${labelOf(key, row)}" to ${row.status}`);
+  } else if (action === "reject") {
+    row.status = "Rejected"; row.rejectedBy = me().id; write(key, rows); logEvent(`rejected project proposal "${labelOf(key, row)}"`);
   } else if (action === "delete") {
-    write(key, rows.filter((r) => r !== row)); logEvent(`deleted ${nouns[key]} "${labelOf(key, row)}"`);
+    write(key, rows.filter((r) => r !== row));
+    if (key === "projects") write("tasks", read("tasks").filter((t) => t.projectId !== row.id));
+    logEvent(`deleted ${nouns[key]} "${labelOf(key, row)}"`);
   }
   renderAll();
 });

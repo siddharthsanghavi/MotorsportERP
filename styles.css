@@ -246,3 +246,42 @@ td:last-child { text-align: right; white-space: nowrap; }
 .org-box span { font: 700 .7rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); } .org-box small { font-size: .7rem; color: var(--ink-3); }
 .org-box.hl { border-color: var(--accent); }
 .react-flow__node-box .react-flow__handle { opacity: 0; }
+
+/* ---------- Projects ---------- */
+textarea { font: inherit; font-size: .86rem; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: var(--surface); color: var(--ink); resize: vertical; }
+textarea:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+label.wide { grid-column: 1 / -1; } select[multiple] { background-image: none; padding-right: 11px; }
+.filters { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.counts { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 16px; }
+.count-chip { font-size: .74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.count-chip b { font-family: var(--mono); margin-left: 3px; color: var(--ink); }
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
+.project { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--surface); display: flex; flex-direction: column; gap: 10px; box-shadow: inset 3px 0 0 var(--stage, var(--line)); }
+.project header { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.project h3 { margin: 0 0 6px; font-size: .98rem; }
+.project .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .74rem; color: var(--ink-3); align-items: center; }
+.project .summary { margin: 0; font-size: .84rem; color: var(--ink-2); line-height: 1.5; }
+.project .people { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.project .label { font: 700 .62rem/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+.person-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.person-chip.poc { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 650; }
+.person-chip .x { background: none; border: 0; padding: 0 0 0 2px; color: var(--ink-3); font-size: .9rem; line-height: 1; }
+.person-chip .x:hover { color: var(--bad); background: none; }
+.warn-chip { font-size: .72rem; font-weight: 650; padding: 3px 9px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); }
+.assign-row { display: flex; gap: 12px; flex-wrap: wrap; } label.inline.small select { font-size: .78rem; padding: 5px 28px 5px 8px; max-width: 200px; }
+.progress-row { display: flex; align-items: center; gap: 10px; } .progress-row .progress { flex: 1; } .progress-row span { font: 500 .72rem var(--mono); color: var(--ink-3); white-space: nowrap; }
+.project details summary { cursor: pointer; font-size: .8rem; font-weight: 650; color: var(--ink-2); }
+table.compact { min-width: 380px; } table.compact th, table.compact td { padding: 7px 6px; font-size: .78rem; }
+.task-form { display: grid; grid-template-columns: 1fr 140px 130px auto; gap: 6px; margin-top: 8px; } .task-form input, .task-form select { font-size: .78rem; padding: 6px 8px; }
+button.small { font-size: .78rem; padding: 6px 12px; }
+.project footer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--line-2); padding-top: 10px; }
+.stage-chip { font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; white-space: nowrap; background: var(--surface-2); color: var(--ink-2); }
+.stage-chip.proposed, .count-chip.proposed { background: var(--role-soft); color: var(--role); } .project.stage-proposed { --stage: var(--role); }
+.stage-chip.approved { background: var(--ev-soft); color: var(--ev); } .project.stage-approved { --stage: var(--ev); }
+.stage-chip.in-progress { background: var(--warn-soft); color: var(--warn); } .project.stage-in-progress { --stage: var(--warn); }
+.stage-chip.review { background: var(--accent-soft); color: var(--accent-ink); } .project.stage-review { --stage: var(--accent); }
+.stage-chip.complete { background: var(--ok-soft); color: var(--ok); } .project.stage-complete { --stage: var(--ok); }
+.stage-chip.rejected { background: var(--bad-soft); color: var(--bad); } .project.stage-rejected { --stage: var(--bad); opacity: .8; }
+.status.task-done { color: var(--ok); } .status.task-blocked { color: var(--bad); } .status.task-in-progress { color: var(--warn); }
+@media (max-width: 640px) { .projects { grid-template-columns: 1fr; } .task-form { grid-template-columns: 1fr 1fr; } }
+.projects { align-items: start; } table.compact td:nth-child(3) { white-space: nowrap; }

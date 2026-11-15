@@ -7,6 +7,7 @@ Open `index.html` in a browser (or serve the folder with any static file server)
 
 ### Modules
 
+- Projects: propose a project (subteam, cost, target date, people), get it approved by the subteam lead or leadership, then track it through Approved → In Progress → Review → Complete. Several people can be assigned; the subteam lead picks one as POC. Each project has assigned tasks with due dates and a progress bar, and open tasks show up in each person's queue.
 - Parts and inventory: add, search, advance lifecycle, and delete tracked parts
 - Purchasing and vendors: create purchase requests with vendor, amount, due date, and status
 - Machine shop: queue jobs with owner, material, due date, priority, and status

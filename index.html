@@ -17,6 +17,7 @@
 
       <nav class="tabs" aria-label="Main navigation">
         <button class="tab active" data-view="overview"><span>Overview</span><small>Team pulse</small></button>
+        <button class="tab" data-view="projects"><span>Projects</span><small>Proposals & tasks</small></button>
         <button class="tab" data-view="parts"><span>Parts & Inventory</span><small>Track assets</small></button>
         <button class="tab" data-view="assembly"><span>Assembly</span><small>Parts tree & EV/ICE</small></button>
         <button class="tab" data-view="purchasing"><span>Purchasing</span><small>Vendors & requests</small></button>
@@ -30,6 +31,24 @@
         <div class="stats" id="stats"></div>
         <div class="card"><p class="eyebrow">MY QUEUE</p><h2 id="my-queue-title">Waiting on you</h2><div id="my-queue" class="activity"></div></div>
         <div class="card"><div class="list-header"><div><p class="eyebrow">AUDIT LOG</p><h2>Recent activity</h2></div><button class="secondary" data-go="purchasing">Add purchase request</button></div><div id="activity" class="activity"></div></div>
+      </section>
+
+      <section id="projects" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Project lifecycle</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-projects" class="flow short"></div></div>
+        <div class="card"><p class="eyebrow">PROPOSAL</p><h2>Propose a project</h2>
+          <form id="project-form" class="form-grid">
+            <label>Project name<input name="name" required placeholder="e.g. Lightweight front upright" /></label>
+            <label>Subteam<select name="subteam" id="project-subteam" required></select></label>
+            <label>Estimated cost ($)<input name="estCost" type="number" min="0" step="0.01" /></label>
+            <label>Target date<input name="targetDate" type="date" /></label>
+            <label class="wide">Summary / justification<textarea name="summary" rows="2" placeholder="What it is, why it's worth doing, and what success looks like"></textarea></label>
+            <label class="wide">People to assign <small class="hint">Ctrl/⌘-click to pick several. The subteam lead picks the POC after approval.</small><select name="assignees" id="project-assignees" multiple size="5"></select></label>
+            <button>Submit proposal</button>
+          </form>
+        </div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">TRACKING</p><h2>Projects</h2></div><div class="filters"><label class="check"><input type="checkbox" id="project-mine" />Only mine</label><div class="seg" id="project-filter"><button class="active" data-filter="Active">Active</button><button data-filter="Proposed">Proposals</button><button data-filter="Complete">Complete</button><button data-filter="Rejected">Rejected</button><button data-filter="All">All</button></div></div></div>
+          <div id="project-counts" class="counts"></div>
+          <div id="projects-list" class="projects"></div><p id="projects-empty" class="empty">No projects match.</p></div>
       </section>
 
       <section id="parts" class="view">
