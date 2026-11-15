@@ -4,13 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MotorsportERP - FSAE Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="container">
       <header class="hero">
         <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>One workspace for parts, purchasing, manufacturing, budgets, and design sign-off.</p></div>
-        <div class="hero-actions"><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button></div>
       </header>
 
       <nav class="tabs" aria-label="Main navigation">
@@ -21,14 +23,18 @@
         <button class="tab" data-view="machine-shop"><span>Machine Shop</span><small>Manufacturing queue</small></button>
         <button class="tab" data-view="budget"><span>Budget</span><small>Spend control</small></button>
         <button class="tab" data-view="approvals"><span>Approvals</span><small>Design sign-off</small></button>
+        <button class="tab" data-view="team"><span>Team</span><small>Members & roles</small></button>
       </nav>
 
       <section id="overview" class="view active">
         <div class="stats" id="stats"></div>
-        <div class="card"><div class="list-header"><div><p class="eyebrow">WORK QUEUE</p><h2>Recent activity</h2></div><button class="secondary" data-go="purchasing">Add purchase request</button></div><div id="activity" class="activity"></div></div>
+        <div class="card"><p class="eyebrow">MY QUEUE</p><h2 id="my-queue-title">Waiting on you</h2><div id="my-queue" class="activity"></div></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">AUDIT LOG</p><h2>Recent activity</h2></div><button class="secondary" data-go="purchasing">Add purchase request</button></div><div id="activity" class="activity"></div></div>
       </section>
 
       <section id="parts" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Part lifecycle</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-parts" class="flow short"></div></div>
+        
         <div class="card"><p class="eyebrow">INVENTORY</p><h2>Track a part</h2>
           <form id="part-form" class="form-grid">
             <label>Part name<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option><option>Other</option></select></label>
@@ -41,18 +47,24 @@
       <section id="assembly" class="view">
         <div class="card"><div class="list-header"><div><p class="eyebrow">STRUCTURE</p><h2>Parts tree</h2></div><div class="seg" id="tree-filter"><button class="active" data-platform="All">All</button><button data-platform="EV">EV car</button><button data-platform="ICE">ICE car</button></div></div>
           <p class="hint">Each part connects to the assembly it mounts on. Set a part's parent assembly on the Parts tab.</p>
-          <div id="parts-tree" class="tree"></div><p id="tree-empty" class="empty">No parts yet. Load demo data or add parts.</p></div>
+          <div class="seg" id="mode-toggle"><button class="active" data-mode="tree">List</button><button data-mode="graph">Graph</button></div>
+          <div id="parts-tree-wrap"><div id="parts-tree" class="tree"></div><p id="tree-empty" class="empty">No parts yet. Load demo data or add parts.</p></div>
+          <div id="parts-flow-wrap" class="hidden"><p id="flow-hint" class="hint"></p><div id="parts-flow" class="flow"></div></div></div>
         <div class="card"><p class="eyebrow">PLATFORM COMMONALITY</p><h2>Shared parts: EV vs ICE</h2><div id="venn"></div></div>
       </section>
 
       <section id="purchasing" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Purchasing process</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-purchases" class="flow short"></div></div>
+        
         <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>Vendor & purchase request</h2>
-          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Request status<select name="status"><option>Requested</option><option>Quoted</option><option>Approved</option><option>Ordered</option><option>Received</option></select></label><button>Save request</button></form>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><button>Save request</button></form>
         </div>
-        <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
+        <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
       </section>
 
       <section id="machine-shop" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Manufacturing process</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-jobs" class="flow short"></div></div>
+        
         <div class="card"><p class="eyebrow">MANUFACTURING</p><h2>Machine shop job</h2>
           <form id="job-form" class="form-grid"><label>Job / part<input name="name" required /></label><label>Owner<input name="owner" required /></label><label>Material<input name="material" placeholder="7075-T6, steel..." required /></label><label>Due date<input name="dueDate" type="date" required /></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Critical</option></select></label><button>Queue job</button></form>
         </div>
@@ -60,19 +72,34 @@
       </section>
 
       <section id="budget" class="view">
-        <div class="card"><p class="eyebrow">FINANCE</p><h2>Budget allocation</h2>
+        <div class="card" data-perm="create:budgets"><p class="eyebrow">FINANCE</p><h2>Budget allocation</h2><p class="no-perm hint hidden">🔒 Only a Budget Manager can set allocations.</p>
           <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><label>Spent ($)<input name="spent" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
         </div>
         <div class="card"><h2>Budget overview</h2><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
       </section>
 
       <section id="approvals" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Design review process</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-approvals" class="flow short"></div></div>
+        
         <div class="card"><p class="eyebrow">ENGINEERING GOVERNANCE</p><h2>Submit a design for approval</h2>
           <form id="approval-form" class="form-grid"><label>Design / document<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option></select></label><label>Reviewer<input name="reviewer" required /></label><label>Revision<input name="revision" placeholder="Rev A" required /></label><button>Submit for review</button></form>
         </div>
-        <div class="card"><h2>Approval board</h2><div class="table-wrap"><table><thead><tr><th>Design</th><th>Subsystem</th><th>Revision</th><th>Reviewer</th><th>Status</th><th></th></tr></thead><tbody id="approvals-body"></tbody></table></div><p id="approvals-empty" class="empty">No designs awaiting review.</p></div>
+        <div class="card"><h2>Approval board</h2><div class="table-wrap"><table><thead><tr><th>Design</th><th>Subsystem</th><th>Revision</th><th>Submitted by</th><th>Reviewer</th><th>Status</th><th></th></tr></thead><tbody id="approvals-body"></tbody></table></div><p id="approvals-empty" class="empty">No designs awaiting review.</p></div>
+      </section>
+      <section id="team" class="view">
+        <div class="card" data-perm="manage:team"><p class="eyebrow">ROSTER</p><h2>Add a team member</h2><p class="no-perm hint hidden">🔒 Only an Admin can change the roster and roles.</p>
+          <form id="member-form" class="form-grid"><label>Name<input name="name" required /></label><label>Subteam<select name="subsystem"><option value="">—</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option></select></label><fieldset class="roles-pick"><legend>Roles</legend><div id="member-roles"></div></fieldset><button>Add member</button></form>
+        </div>
+        <div class="card"><h2>Team</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Roles</th><th>Subteam</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
+        <div class="card"><p class="eyebrow">WHO CAN DO WHAT</p><h2>Roles</h2><ul id="role-guide" class="role-guide"></ul><p class="hint">Roles only control what this page lets you do. Anyone with the file can still change the stored data, so this isn't security until there's a backend with real logins.</p></div>
       </section>
     </main>
+    <div id="toast" class="toast" role="status"></div>
+    <link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css" />
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
+    <script src="flow.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -12,5 +12,9 @@ Open `index.html` in a browser (or serve the folder with any static file server)
 - Machine shop: queue jobs with owner, material, due date, priority, and status
 - Budget tracker: record category allocations and see spend remaining/progress
 - Design approvals: submit revisions for review and advance approval status
-- Overview dashboard with counts and recent activity
+- Assembly: parts tree (list or React Flow graph) of what mounts on what, plus an EV vs ICE shared-parts Venn diagram
+- Team & roles: members hold roles (Admin, Purchasing Approver, Design Review Approver, Subteam Lead, Budget Manager, Shop Lead); switch "Acting as" in the header to see each person's permissions. Approvers can't sign off their own requests. Roles are enforced in the page only, not as real security.
+- Overview dashboard with counts, a "waiting on you" queue, and an audit log of who did what
+
+The React Flow graph loads React and React Flow from unpkg, so it needs an internet connection; everything else works offline.
 - Demo controls: load realistic records across every module or clear the local workspace
