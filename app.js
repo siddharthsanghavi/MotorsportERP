@@ -21,7 +21,23 @@ const ROLES = {
 };
 const me = () => { const team = read("team"); return team.find((m) => m.id === localStorage.getItem(KEYS.me)) || team[0] || { id: "", name: "Guest", roles: [] }; };
 const has = (role, user = me()) => user.roles.includes("Admin") || user.roles.includes(role);
-const leads = (subsystem, user = me()) => user.roles.includes("Admin") || (user.roles.includes("Subteam Lead") && user.subsystem === subsystem);
+// Org structure. `reportsTo` is the leadership title each subteam reports to; `subsystem` maps it onto part subsystems for permissions.
+const SUBTEAMS = {
+  "Low Voltage": { reportsTo: "Vice President", subsystem: "Electronics" },
+  "EV Powertrain": { reportsTo: "Vice President", subsystem: "Powertrain" },
+  "Vehicle Dynamics": { reportsTo: "Chief Mechanic", subsystem: "Suspension" },
+  "Suspension": { reportsTo: "Chief Mechanic", subsystem: "Suspension" },
+  "Driver Interface": { reportsTo: "Chief Mechanic", subsystem: "Chassis" },
+  "Frame": { reportsTo: "Chief Mechanic", subsystem: "Chassis" },
+  "Driveline": { reportsTo: "Chief Mechanic", subsystem: "Powertrain" },
+  "Combustion": { reportsTo: "Chief Mechanic", subsystem: "Powertrain" },
+  "Aerodynamics": { reportsTo: "Chief Mechanic", subsystem: "Aero" },
+  "Composites": { reportsTo: "Chief Mechanic", subsystem: "Aero" },
+  "Manufacturing": { reportsTo: "Chief Mechanic", subsystem: "Chassis" },
+  "Business": { reportsTo: "Business Lead", subsystem: "" }
+};
+const TITLES = ["President", "Vice President", "Chief Mechanic", "Business Lead", "Faculty Advisor"];
+const leads = (subsystem, user = me()) => user.roles.includes("Admin") || (user.roles.includes("Subteam Lead") && (user.subsystem === subsystem || (user.leads || []).some((t) => SUBTEAMS[t]?.subsystem === subsystem)));
 const own = (row, user = me()) => row.createdBy && row.createdBy === user.id;
 
 function can(action, key, row) {
@@ -49,15 +65,40 @@ function logEvent(text) {
 }
 
 // ---------- Demo data ----------
-const demoTeam = [
-  { name: "Maya Chen", roles: ["Admin", "Subteam Lead"], subsystem: "Suspension" },
-  { name: "Noah Williams", roles: ["Purchasing Approver", "Budget Manager"], subsystem: "" },
-  { name: "Dr. Kim", roles: ["Design Review Approver"], subsystem: "" },
-  { name: "Jordan Lee", roles: ["Design Review Approver", "Subteam Lead"], subsystem: "Chassis" },
-  { name: "Priya Singh", roles: ["Subteam Lead"], subsystem: "Powertrain" },
-  { name: "Ava Patel", roles: ["Shop Lead"], subsystem: "" },
-  { name: "Sam Ortiz", roles: [], subsystem: "Electronics" }
-];
+// Fictional roster: a fixed core (referenced by demo records) plus generated leads and members.
+function buildDemoTeam() {
+  let seed = 20262027;
+  const rand = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+  const first = ["Alex", "Bailey", "Casey", "Dana", "Eli", "Finley", "Gray", "Harper", "Indi", "Jules", "Kai", "Logan", "Morgan", "Nico", "Oakley", "Parker", "Quinn", "Reese", "Sage", "Taylor", "Uma", "Val", "Wren", "Xander", "Yara", "Zion", "Rowan", "Emery", "Skyler", "Arden", "Blair", "Cam", "Drew", "Ellis", "Hayden", "Jesse", "Kendall", "Lane", "Marlow", "Remy"];
+  const last = ["Ashford", "Brightwater", "Calloway", "Dunmore", "Everly", "Fairbanks", "Galloway", "Hartwell", "Ironside", "Jessup", "Kingsley", "Lockridge", "Merriweather", "Northcott", "Oakhurst", "Pemberton", "Quill", "Ravenscroft", "Stonebridge", "Thornbury", "Underhill", "Vance", "Whitlock", "Yardley", "Zeller", "Ashworth", "Blackwood", "Castellan", "Delacroix", "Emberly", "Foxworth", "Greywell"];
+  const used = new Set(["Maya Chen", "Noah Williams", "Dr. Kim", "Jordan Lee", "Priya Singh", "Ava Patel", "Sam Ortiz"]);
+  const newName = () => { let n; do { n = `${pick(first)} ${pick(last)}`; } while (used.has(n)); used.add(n); return n; };
+  const team = [
+    { name: "Maya Chen", title: "President", roles: ["Admin"], subteams: ["Vehicle Dynamics"], leads: [] },
+    { name: "Jordan Lee", title: "Vice President", roles: ["Design Review Approver"], subteams: ["Low Voltage"], leads: [] },
+    { name: "Ava Patel", title: "Chief Mechanic", roles: ["Shop Lead", "Design Review Approver"], subteams: ["Manufacturing"], leads: [] },
+    { name: "Noah Williams", title: "Business Lead", roles: ["Purchasing Approver", "Budget Manager"], subteams: ["Business"], leads: ["Business"] },
+    { name: "Dr. Kim", title: "Faculty Advisor", roles: ["Design Review Approver"], subteams: [], leads: [] },
+    { name: "Priya Singh", title: "", roles: [], subteams: ["EV Powertrain", "Low Voltage"], leads: ["EV Powertrain"] },
+    { name: "Sam Ortiz", title: "", roles: [], subteams: ["Low Voltage", "Driver Interface"], leads: [] }
+  ];
+  const names = Object.keys(SUBTEAMS);
+  names.filter((t) => !team.some((m) => m.leads.includes(t))).forEach((t) => {
+    const extra = rand() < 0.35 ? [pick(names.filter((x) => x !== t))] : [];
+    team.push({ name: newName(), title: "", roles: [], subteams: [t, ...extra], leads: [t] });
+  });
+  for (let i = 0; i < 36; i++) {
+    const count = rand() < 0.55 ? 1 : rand() < 0.75 ? 2 : 3;
+    const set = new Set(); while (set.size < count) set.add(pick(names));
+    team.push({ name: newName(), title: "", roles: [], subteams: [...set], leads: [] });
+  }
+  return team.map((m) => ({
+    ...m,
+    roles: m.leads.length && !m.roles.includes("Subteam Lead") ? [...m.roles, "Subteam Lead"] : m.roles,
+    subsystem: m.leads.length ? SUBTEAMS[m.leads[0]].subsystem : ""
+  }));
+}
 const demoData = {
   // [name, subsystem, parent, platform, qty, location, status]
   parts: [
@@ -142,12 +183,13 @@ function showView(view) {
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
   if (view === "assembly") renderFlow();
   renderProcesses();
+  if (view === "team") renderOrg();
 }
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
 document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
 
 function loadDemoData() {
-  const team = demoTeam.map((m) => ({ ...m, id: id() }));
+  const team = buildDemoTeam().map((m) => ({ ...m, id: id() }));
   write("team", team);
   const idByName = Object.fromEntries(team.map((m) => [m.name, m.id]));
   Object.entries(demoData).forEach(([key, rows]) => write(key, rows.map(({ by, ...row }) => ({ ...row, id: id(), createdAt: new Date().toISOString(), createdBy: idByName[by] || "" }))));
@@ -181,7 +223,8 @@ const actions = (key, row, advanceLabel = "Advance") => {
 function renderUser() {
   const team = read("team"); const u = me();
   $("#user-select").innerHTML = team.map((m) => `<option value="${m.id}" ${m.id === u.id ? "selected" : ""}>${esc(m.name)}</option>`).join("");
-  $("#user-roles").innerHTML = (u.roles.length ? u.roles : ["Member"]).map((r) => `<span class="role-chip">${esc(r)}${r === "Subteam Lead" && u.subsystem ? ` · ${esc(u.subsystem)}` : ""}</span>`).join("");
+  const chips = [...(u.title ? [u.title] : []), ...(u.leads || []).map((t) => `★ ${t} Lead`), ...u.roles.filter((r) => r !== "Subteam Lead")];
+  $("#user-roles").innerHTML = (chips.length ? chips : ["Member"]).map((r) => `<span class="role-chip">${esc(r)}</span>`).join("");
   document.querySelectorAll("[data-perm]").forEach((el) => { const [action, key] = el.dataset.perm.split(":"); const ok = can(action, key); el.querySelector("form")?.classList.toggle("hidden", !ok); el.querySelector(".no-perm")?.classList.toggle("hidden", ok); });
 }
 function renderParts() {
@@ -213,7 +256,9 @@ function renderApprovals() {
 }
 function renderTeam() {
   const team = read("team"); const manage = can("manage", "team");
-  $("#team-body").innerHTML = team.map((m) => `<tr><td><strong>${esc(m.name)}</strong></td><td>${(m.roles.length ? m.roles : ["Member"]).map((r) => `<span class="role-chip">${esc(r)}</span>`).join(" ")}</td><td>${esc(m.subsystem || "—")}</td><td>${manage && team.length > 1 && m.id !== me().id ? `<button class="link danger" data-action="remove-member" data-id="${m.id}">Remove</button>` : ""}</td></tr>`).join("");
+  $("#team-count").textContent = `${team.length} members · ${Object.keys(SUBTEAMS).length} subteams`;
+  const subteamCell = (m) => (m.subteams || []).map((t) => `<span class="team-tag${(m.leads || []).includes(t) ? " lead" : ""}">${(m.leads || []).includes(t) ? "★ " : ""}${esc(t)}</span>`).join(" ") || "—";
+  $("#team-body").innerHTML = team.map((m) => `<tr><td><strong>${esc(m.name)}</strong></td><td>${esc(m.title || ((m.leads || []).length ? "Subteam Lead" : "Member"))}</td><td>${subteamCell(m)}</td><td>${m.roles.filter((r) => r !== "Subteam Lead").map((r) => `<span class="role-chip">${esc(r)}</span>`).join(" ") || `<span class="hint">—</span>`}</td><td>${manage && team.length > 1 && m.id !== me().id ? `<button class="link danger" data-action="remove-member" data-id="${m.id}">Remove</button>` : ""}</td></tr>`).join("");
   $("#role-guide").innerHTML = `<li><strong>Member</strong> (everyone): add parts, submit purchase requests, shop jobs, and design reviews</li>` + Object.entries(ROLES).map(([r, d]) => `<li><strong>${esc(r)}</strong>: ${esc(d)}</li>`).join("");
 }
 function renderOverview() {
@@ -325,9 +370,22 @@ function renderProcess(key) {
 }
 const renderProcesses = () => Object.keys(PROCESSES).forEach(renderProcess);
 
+// ---------- Org map (React Flow) ----------
+let orgFocus = "";
+function renderOrg() {
+  const box = $("#org-flow");
+  if (!$("#team").classList.contains("active")) return;
+  if (!window.MotorsportFlow?.available) { box.innerHTML = `<p class="empty">React Flow didn't load (needs an internet connection).</p>`; return; }
+  const team = read("team");
+  const select = $("#org-focus");
+  select.innerHTML = `<option value="">Highlight a member…</option>` + [...team].sort((a, b) => a.name.localeCompare(b.name)).map((m) => `<option value="${m.id}" ${m.id === orgFocus ? "selected" : ""}>${esc(m.name)}${(m.subteams || []).length > 1 ? ` (${m.subteams.length} subteams)` : ""}</option>`).join("");
+  window.MotorsportFlow.renderOrg(box, { team, subteams: SUBTEAMS, focus: orgFocus, meId: me().id, onFocus: (memberId) => { orgFocus = memberId === orgFocus ? "" : memberId; renderOrg(); } });
+}
+$("#org-focus").addEventListener("change", (e) => { orgFocus = e.target.value; renderOrg(); });
+
 function flash(text) { const el = $("#toast"); el.textContent = text; el.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.remove("show"), 3200); }
 
-const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProcesses(); };
+const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProcesses(); renderOrg(); };
 
 // ---------- Forms & actions ----------
 const labelOf = (key, row) => row.name || row.item || row.category || "item";
@@ -344,10 +402,16 @@ $("#member-form").addEventListener("submit", (event) => {
   event.preventDefault();
   if (!can("manage", "team")) return;
   const form = new FormData(event.target);
-  const member = { id: id(), name: form.get("name"), roles: form.getAll("roles"), subsystem: form.get("subsystem") || "" };
+  const lead = form.get("lead") || "";
+  const subteams = [...new Set([...form.getAll("subteams"), ...(lead ? [lead] : [])])];
+  const roles = form.getAll("roles"); if (lead && !roles.includes("Subteam Lead")) roles.push("Subteam Lead");
+  const member = { id: id(), name: form.get("name"), title: form.get("title") || "", roles, subteams, leads: lead ? [lead] : [], subsystem: lead ? SUBTEAMS[lead].subsystem : "" };
   write("team", [...read("team"), member]); logEvent(`added ${member.name} to the team`); event.target.reset(); renderAll();
 });
-$("#member-roles").innerHTML = Object.keys(ROLES).map((r) => `<label class="check"><input type="checkbox" name="roles" value="${esc(r)}" />${esc(r)}</label>`).join("");
+$("#member-subteams").innerHTML = Object.keys(SUBTEAMS).map((t) => `<label class="check"><input type="checkbox" name="subteams" value="${esc(t)}" />${esc(t)}</label>`).join("");
+$("#member-lead").innerHTML = `<option value="">— None —</option>` + Object.keys(SUBTEAMS).map((t) => `<option>${esc(t)}</option>`).join("");
+$("#member-title").innerHTML = `<option value="">Member</option>` + TITLES.map((t) => `<option>${esc(t)}</option>`).join("");
+$("#member-roles").innerHTML = Object.keys(ROLES).filter((r) => r !== "Subteam Lead").map((r) => `<label class="check"><input type="checkbox" name="roles" value="${esc(r)}" />${esc(r)}</label>`).join("");
 $("#part-search").addEventListener("input", renderParts);
 
 const next = { parts: ["In Design", "Manufacturing", "In Inventory", "Installed", "Damaged"], purchases: ["Requested", "Quoted", "Approved", "Ordered", "Received"], jobs: ["Queued", "In Progress", "Quality Check", "Complete"], approvals: ["Pending Review", "Changes Requested", "Approved"] };

@@ -13,6 +13,7 @@ Open `index.html` in a browser (or serve the folder with any static file server)
 - Budget tracker: record category allocations and see spend remaining/progress
 - Design approvals: submit revisions for review and advance approval status
 - Assembly: parts tree (list or React Flow graph) of what mounts on what, plus an EV vs ICE shared-parts Venn diagram
+- Team map: React Flow org chart with President, Vice President, and Chief Mechanic at the top, 12 subteams (Low Voltage, EV Powertrain, Vehicle Dynamics, Suspension, Driver Interface, Frame, Driveline, Combustion, Aerodynamics, Composites, Manufacturing, Business) grouped under their leader, a lead per subteam, and members who can sit on several subteams. Demo roster names are generated and fictional.
 - Team & roles: members hold roles (Admin, Purchasing Approver, Design Review Approver, Subteam Lead, Budget Manager, Shop Lead); switch "Acting as" in the header to see each person's permissions. Approvers can't sign off their own requests. Roles are enforced in the page only, not as real security.
 - Overview dashboard with counts, a "waiting on you" queue, and an audit log of who did what
 

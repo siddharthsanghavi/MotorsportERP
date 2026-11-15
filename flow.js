@@ -3,7 +3,7 @@
 (function () {
   const RF = window.ReactFlow;
   if (!window.React || !window.ReactDOM || !RF) {
-    window.MotorsportFlow = { available: false, render() {}, renderProcess() {} };
+    window.MotorsportFlow = { available: false, render() {}, renderProcess() {}, renderOrg() {} };
     return;
   }
   const h = React.createElement;
@@ -107,9 +107,86 @@
     }, h(Background, { gap: 18, size: 1, color: "rgba(148,163,184,.35)" }));
   }
 
+
+  // Org map: leadership row(s) on top, subteam cards underneath their leader.
+  function PersonNode({ data }) {
+    return h(React.Fragment, null,
+      h(Handle, { type: "target", position: Position.Top, id: "in" }),
+      h(Handle, { type: "source", position: Position.Bottom, id: "out" }),
+      h("div", { className: "org-person" + (data.hl ? " hl" : "") + (data.me ? " me" : "") },
+        h("span", { className: "org-title" }, data.title),
+        h("strong", { className: "nodrag org-click", onClick: data.onClick }, data.name),
+        data.sub ? h("small", null, data.sub) : null));
+  }
+  function TeamNode({ data }) {
+    const chip = (m, lead) => h("li", {
+      key: m.id, className: "nodrag org-click" + (lead ? " lead" : "") + (m.id === data.focus ? " hl" : "") + (m.id === data.meId ? " me" : ""),
+      onClick: () => data.onFocus(m.id), title: (m.subteams || []).join(", ")
+    }, lead ? "★ " : "", m.name, (m.subteams || []).length > 1 ? h("em", null, "+" + ((m.subteams || []).length - 1)) : null);
+    return h(React.Fragment, null,
+      h(Handle, { type: "target", position: Position.Top, id: "in" }),
+      h("div", { className: "org-team" + (data.hl ? " hl" : "") },
+        h("div", { className: "org-team-top" }, h("span", null, data.name), h("b", null, data.members.length + data.leads.length)),
+        h("ul", null, data.leads.map((m) => chip(m, true)), data.members.map((m) => chip(m, false)))));
+  }
+  function BoxNode({ data }) {
+    return h(React.Fragment, null, h(Handle, { type: "target", position: Position.Top, id: "in" }),
+      h("div", { className: "org-box" + (data.hl ? " hl" : "") }, h("span", null, data.label), h("small", null, data.count + " subteams")));
+  }
+  const orgTypes = { person: PersonNode, team: TeamNode, box: BoxNode };
+
+  function Org({ team, subteams, focus, meId, onFocus }) {
+    const byTitle = (t) => team.find((m) => m.title === t);
+    const names = Object.keys(subteams);
+    const parents = ["Vice President", "Chief Mechanic", "Business Lead"];
+    const COL = 230, GAP = 70, nodes = [], edges = [];
+    const BLOCK_LABEL = { "Vice President": "Electrical", "Chief Mechanic": "Mechanical", "Business Lead": "Business" };
+    const cardH = (n) => 48 + n * 25;
+    let bx = 0; const parentX = {}; const TOP = 280;
+    parents.forEach((p) => {
+      const kids = names.filter((t) => subteams[t].reportsTo === p);
+      const cols = Math.min(kids.length, 5); const rows = Math.ceil(kids.length / cols);
+      const cards = kids.map((t) => {
+        const leads = team.filter((m) => (m.leads || []).includes(t));
+        const members = team.filter((m) => (m.subteams || []).includes(t) && !(m.leads || []).includes(t)).sort((a, b) => a.name.localeCompare(b.name));
+        return { t, leads, members, hl: !!focus && [...leads, ...members].some((m) => m.id === focus) };
+      });
+      const rowH = [...Array(rows)].map((_, r) => Math.max(...cards.slice(r * cols, r * cols + cols).map((c) => cardH(c.leads.length + c.members.length))) + 20);
+      let y = TOP + 44;
+      for (let r = 0; r < rows; r++) {
+        cards.slice(r * cols, r * cols + cols).forEach((c, i) => nodes.push({ id: "t:" + c.t, type: "team", position: { x: bx + 16 + i * COL, y }, data: { name: c.t, ...c, focus, meId, onFocus } }));
+        y += rowH[r];
+      }
+      const width = cols * COL + 12; const anyHl = cards.some((c) => c.hl);
+      nodes.unshift({ id: "b:" + p, type: "box", position: { x: bx, y: TOP }, data: { label: BLOCK_LABEL[p], count: kids.length, hl: anyHl }, style: { width, height: y - TOP }, zIndex: -1, draggable: false, selectable: false });
+      edges.push({ id: "e:b:" + p, source: "p:" + p, target: "b:" + p, type: "smoothstep", style: { stroke: anyHl ? "#e11d48" : "#94a3b8", strokeWidth: anyHl ? 2 : 1.5 } });
+      parentX[p] = bx + width / 2 - 100;
+      bx += width + GAP;
+    });
+    const person = (title, x, y, sub) => {
+      const m = byTitle(title);
+      nodes.push({ id: "p:" + title, type: "person", position: { x, y }, data: { title, name: m ? m.name : "(vacant)", sub, hl: m && m.id === focus, me: m && m.id === meId, onClick: () => m && onFocus(m.id) } });
+    };
+    parents.forEach((p) => person(p, parentX[p], 140, null));
+    const presX = parentX["Chief Mechanic"];
+    person("President", presX, 0, null);
+    if (byTitle("Faculty Advisor")) person("Faculty Advisor", presX + 2 * COL, 0, "advises");
+    parents.forEach((p) => edges.push({ id: "e:" + p, source: "p:President", target: "p:" + p, type: "smoothstep", style: { stroke: "#64748b", strokeWidth: 1.5 } }));
+    if (byTitle("Faculty Advisor")) edges.push({ id: "e:adv", source: "p:Faculty Advisor", target: "p:President", type: "straight", style: { stroke: "#94a3b8", strokeDasharray: "4 4" } });
+    return h(Flow, {
+      nodes, edges, nodeTypes: orgTypes, fitView: true, fitViewOptions: { padding: 0.04, maxZoom: 1 }, minZoom: 0.2, maxZoom: 1.6,
+      nodesConnectable: false, elementsSelectable: false, zoomOnScroll: false, preventScrolling: false, panOnScroll: false
+    }, h(Background, { gap: 18, size: 1, color: "rgba(148,163,184,.35)" }), h(Controls, { showInteractive: false }));
+  }
+
   const roots = new WeakMap();
   window.MotorsportFlow = {
     available: true,
+    renderOrg(container, props) {
+      let root = roots.get(container);
+      if (!root) { root = ReactDOM.createRoot(container); roots.set(container, root); }
+      root.render(h(ReactFlowProvider, null, h(Org, props)));
+    },
     renderProcess(container, props) {
       let root = roots.get(container);
       if (!root) { root = ReactDOM.createRoot(container); roots.set(container, root); }

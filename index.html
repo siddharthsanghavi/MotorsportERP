@@ -87,10 +87,13 @@
         <div class="card"><h2>Approval board</h2><div class="table-wrap"><table><thead><tr><th>Design</th><th>Subsystem</th><th>Revision</th><th>Submitted by</th><th>Reviewer</th><th>Status</th><th></th></tr></thead><tbody id="approvals-body"></tbody></table></div><p id="approvals-empty" class="empty">No designs awaiting review.</p></div>
       </section>
       <section id="team" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">ORGANIZATION</p><h2>Team map</h2></div><select id="org-focus" aria-label="Highlight a member"></select></div>
+          <p class="hint">Leadership at the top, subteams below. ★ marks each subteam lead. Click a name to highlight every subteam that person is in.</p>
+          <div id="org-flow" class="flow org"></div></div>
         <div class="card" data-perm="manage:team"><p class="eyebrow">ROSTER</p><h2>Add a team member</h2><p class="no-perm hint hidden">🔒 Only an Admin can change the roster and roles.</p>
-          <form id="member-form" class="form-grid"><label>Name<input name="name" required /></label><label>Subteam<select name="subsystem"><option value="">—</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option></select></label><fieldset class="roles-pick"><legend>Roles</legend><div id="member-roles"></div></fieldset><button>Add member</button></form>
+          <form id="member-form" class="form-grid"><label>Name<input name="name" required /></label><label>Title<select name="title" id="member-title"></select></label><label>Leads subteam<select name="lead" id="member-lead"></select></label><fieldset class="roles-pick wide"><legend>Subteams</legend><div id="member-subteams" class="checks"></div></fieldset><fieldset class="roles-pick"><legend>Permissions</legend><div id="member-roles"></div></fieldset><button>Add member</button></form>
         </div>
-        <div class="card"><h2>Team</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Roles</th><th>Subteam</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
+        <div class="card"><div class="list-header"><h2>Roster</h2><span id="team-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Title</th><th>Subteams</th><th>Permissions</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
         <div class="card"><p class="eyebrow">WHO CAN DO WHAT</p><h2>Roles</h2><ul id="role-guide" class="role-guide"></ul><p class="hint">Roles only control what this page lets you do. Anyone with the file can still change the stored data, so this isn't security until there's a backend with real logins.</p></div>
       </section>
     </main>
