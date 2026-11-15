@@ -12,17 +12,20 @@
     <main class="container">
       <header class="hero">
         <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>One workspace for parts, purchasing, manufacturing, budgets, and design sign-off.</p></div>
-        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div><span class="hero-badge">2026 Season</span><button class="secondary" id="seed-data">Load demo data</button><button class="ghost" id="clear-data">Clear workspace</button><div class="backup-box"><button class="ghost" id="backup-export">Backup</button><button class="ghost" id="backup-import">Restore</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small></div></div>
       </header>
 
       <nav class="tabs" aria-label="Main navigation">
         <button class="tab active" data-view="overview"><span>Overview</span><small>Team pulse</small></button>
         <button class="tab" data-view="projects"><span>Projects</span><small>Proposals & tasks</small></button>
         <button class="tab" data-view="parts"><span>Parts & Inventory</span><small>Track assets</small></button>
+        <button class="tab" data-view="testing"><span>Testing</span><small>Track days & wear</small></button>
         <button class="tab" data-view="assembly"><span>Assembly</span><small>Parts tree & EV/ICE</small></button>
         <button class="tab" data-view="purchasing"><span>Purchasing</span><small>Vendors & requests</small></button>
         <button class="tab" data-view="machine-shop"><span>Machine Shop</span><small>Manufacturing queue</small></button>
+        <button class="tab" data-view="stock"><span>Stock & Tools</span><small>Check-out & reorder</small></button>
         <button class="tab" data-view="budget"><span>Budget</span><small>Spend control</small></button>
+        <button class="tab" data-view="documents"><span>Documents</span><small>Drawings, reports, rules</small></button>
         <button class="tab" data-view="approvals"><span>Approvals</span><small>Design sign-off</small></button>
         <button class="tab" data-view="team"><span>Team</span><small>Members & roles</small></button>
       </nav>
@@ -49,6 +52,9 @@
         <div class="card"><div class="list-header"><div><p class="eyebrow">TRACKING</p><h2>Projects</h2></div><div class="filters"><label class="check"><input type="checkbox" id="project-mine" />Only mine</label><div class="seg" id="project-filter"><button class="active" data-filter="Active">Active</button><button data-filter="Proposed">Proposals</button><button data-filter="Complete">Complete</button><button data-filter="Rejected">Rejected</button><button data-filter="All">All</button></div></div></div>
           <div id="project-counts" class="counts"></div>
           <div id="projects-list" class="projects"></div><p id="projects-empty" class="empty">No projects match.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">SEASON</p><h2>Timeline</h2></div><span class="hint">Bars run from approval to target date. Milestone dates are placeholders; set your real event dates.</span></div>
+          <div id="timeline" class="timeline-wrap"></div>
+          <div class="milestones"><div id="milestones-list"></div><form id="milestone-form" class="inline-form"><input name="name" required placeholder="Milestone, e.g. Design freeze" /><input name="date" type="date" required /><button class="secondary">Add milestone</button></form></div></div>
       </section>
 
       <section id="parts" class="view">
@@ -56,11 +62,41 @@
         
         <div class="card"><p class="eyebrow">INVENTORY</p><h2>Track a part</h2>
           <form id="part-form" class="form-grid">
-            <label>Part name<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option><option>Other</option></select></label>
-            <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label><label>Location<input name="location" placeholder="Car / Shop / Storage" required /></label><label>Status<select name="status"><option>In Design</option><option>Manufacturing</option><option>In Inventory</option><option>Installed</option><option>Damaged</option></select></label><label>Parent assembly<select name="parent" id="parent-select"><option value="">— Top level —</option></select></label><label>Used on<select name="platform"><option>Both</option><option>EV</option><option>ICE</option></select></label><button>Add part</button>
+            <label>Part number<input name="partNumber" placeholder="SUS-1010" /></label><label>Part name<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option><option>Other</option></select></label>
+            <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Location<input name="location" placeholder="Car / Shop / Storage" required /></label><label>Status<select name="status"><option>In Design</option><option>Manufacturing</option><option>In Inventory</option><option>Installed</option><option>Damaged</option></select></label><label>Parent assembly<select name="parent" id="parent-select"><option value="">— Top level —</option></select></label><label>Used on<select name="platform"><option>Both</option><option>EV</option><option>ICE</option></select></label><button>Add part</button>
           </form>
         </div>
-        <div class="card"><div class="list-header"><h2>Parts & inventory</h2><input id="part-search" type="search" placeholder="Search parts" /></div><div class="table-wrap"><table><thead><tr><th>Part</th><th>Subsystem</th><th>Used on</th><th>Qty</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="parts-body"></tbody></table></div><p id="parts-empty" class="empty">No parts tracked yet.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">BOM</p><h2>Import a bill of materials</h2></div><div class="row-actions"><button class="secondary" id="bom-template">Download template</button><button class="secondary" id="bom-export">Export current BOM</button></div></div>
+          <p class="hint">CSV from SolidWorks, Onshape, Fusion, or a spreadsheet. Columns are matched by name (Part Number, Description, Qty, Parent or Level, Subsystem, Used On, Unit Cost…) and you can fix the mapping before importing. An indented BOM with a Level column builds the parts tree for you.</p>
+          <div class="bom-inputs"><label class="file-drop">Choose CSV file<input type="file" id="bom-file" accept=".csv,.tsv,.txt,text/csv" /></label><div class="bom-paste"><textarea id="bom-paste" rows="3" placeholder="…or paste rows copied from a spreadsheet (with the header row)"></textarea><button class="secondary" id="bom-paste-go">Preview pasted BOM</button></div></div>
+          <div id="bom-preview"></div>
+        </div>
+        <div class="card"><div class="list-header"><h2>Parts & inventory</h2><div class="filters"><button class="secondary" id="part-labels">Print QR labels</button><input id="part-search" type="search" placeholder="Search parts" /></div></div><div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Subsystem</th><th>Used on</th><th>Qty</th><th>Unit cost</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="parts-body"></tbody></table></div><p id="parts-empty" class="empty">No parts tracked yet.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">SAFETY</p><h2>Part life & inspections</h2></div><span class="hint">Km are added from logged test sessions. Set limits with Edit on a part.</span></div>
+          <div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Km used</th><th>Next inspection</th><th>State</th><th></th></tr></thead><tbody id="life-body"></tbody></table></div><p id="life-empty" class="empty">No parts have life limits or inspection intervals yet.</p></div>
+        <div class="card"><p class="eyebrow">RELIABILITY</p><h2>Failure log</h2><div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Part</th><th>Severity</th><th>What happened</th><th>Logged by</th></tr></thead><tbody id="failures-body"></tbody></table></div><p id="failures-empty" class="empty">No failures logged.</p></div>
+      </section>
+
+      <section id="testing" class="view">
+        <div class="card"><p class="eyebrow">TRACK</p><h2>Log a test session</h2>
+          <form id="session-form" class="form-grid">
+            <label>Date<input name="date" type="date" required /></label>
+            <label>Car<select name="car"><option>EV</option><option>ICE</option></select></label>
+            <label>Event<select name="type" id="session-type"></select></label>
+            <label>Location<input name="location" placeholder="Campus lot, kart track…" /></label>
+            <label>Driver<select name="driverId" id="session-driver"></select></label>
+            <label>Laps<input name="laps" type="number" min="0" /></label>
+            <label>Distance (km)<input name="km" type="number" min="0" step="0.1" required /></label>
+            <label>Data log link<input name="dataUrl" type="url" placeholder="https://… (MoTeC / AiM export)" /></label>
+            <label class="wide">Setup & notes<textarea name="notes" rows="2" placeholder="Tyre pressures, ride height, damper clicks, what changed"></textarea></label>
+            <label class="wide">Issues found <small class="hint">One per line. Each becomes a task in the project you pick.</small><textarea name="issues" rows="2"></textarea></label>
+            <label>Add issues as tasks in<select name="taskProjectId" id="session-project"></select></label>
+            <button>Log session</button>
+          </form>
+          <p class="hint">Logging km adds wear to every part marked Installed on that car (and parts used on both).</p>
+        </div>
+        <div class="card"><div class="list-header"><h2>Sessions</h2></div><div id="session-stats" class="mini-stats"></div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Car</th><th>Event</th><th>Driver</th><th>Laps</th><th>Distance</th><th>Notes & issues</th><th></th></tr></thead><tbody id="sessions-body"></tbody></table></div><p id="sessions-empty" class="empty">No sessions logged yet.</p></div>
       </section>
 
       <section id="assembly" class="view">
@@ -76,7 +112,7 @@
         <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Purchasing process</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-purchases" class="flow short"></div></div>
         
         <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>Vendor & purchase request</h2>
-          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><button>Save request</button></form>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Budget<select name="category" id="purchase-category"></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
         </div>
         <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
       </section>
@@ -85,9 +121,18 @@
         <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Manufacturing process</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-jobs" class="flow short"></div></div>
         
         <div class="card"><p class="eyebrow">MANUFACTURING</p><h2>Machine shop job</h2>
-          <form id="job-form" class="form-grid"><label>Job / part<input name="name" required /></label><label>Owner<input name="owner" required /></label><label>Material<input name="material" placeholder="7075-T6, steel..." required /></label><label>Due date<input name="dueDate" type="date" required /></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Critical</option></select></label><button>Queue job</button></form>
+          <form id="job-form" class="form-grid"><label>Job / part<input name="name" required /></label><label>Machinist<select name="ownerId" id="job-owner" required></select></label><label>Machine<select name="machine" id="job-machine"></select></label><label>Machine hours<input name="hours" type="number" min="0" step="0.5" /></label><label>Material<input name="material" placeholder="7075-T6, steel..." required /></label><label>Due date<input name="dueDate" type="date" required /></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Critical</option></select></label><label>For part<select name="partId" id="job-part"></select></label><label>For project<select name="projectId" id="job-project"></select></label><button>Queue job</button></form>
         </div>
-        <div class="card"><h2>Shop queue</h2><div class="table-wrap"><table><thead><tr><th>Job</th><th>Owner</th><th>Material</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead><tbody id="jobs-body"></tbody></table></div><p id="jobs-empty" class="empty">No machine shop jobs queued.</p></div>
+        <div class="card"><h2>Shop queue</h2><div class="table-wrap"><table><thead><tr><th>Job</th><th>Machinist</th><th>Machine</th><th>Material</th><th>Due</th><th>Priority</th><th>Status</th><th></th></tr></thead><tbody id="jobs-body"></tbody></table></div><p id="jobs-empty" class="empty">No machine shop jobs queued.</p></div>
+      </section>
+
+      <section id="stock" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">SHOP</p><h2>Stock & tools</h2></div><div class="filters"><input id="scan-input" placeholder="Scan a QR label…" aria-label="Scan a label" /><select id="stock-kind"><option value="">All kinds</option><option>Tool</option><option>Consumable</option><option>Spare part</option><option>Safety gear</option></select><input id="stock-search" type="search" placeholder="Search stock" /><button class="secondary" id="stock-labels">Print QR labels</button></div></div>
+          <div id="stock-summary" class="mini-stats"></div>
+          <div class="table-wrap"><table><thead><tr><th></th><th>Item</th><th>Kind</th><th>Location</th><th>Available</th><th>Checked out to</th><th></th></tr></thead><tbody id="stock-body"></tbody></table></div><p id="stock-empty" class="empty">No stock items.</p>
+          <p class="hint">Tools need the shop safety orientation (and any listed training) to check out. Tick rows to print labels for just those.</p></div>
+        <div class="card" id="stock-form-card"><p class="eyebrow">ADD</p><h2>Add a stock item or tool</h2>
+          <form id="stock-form" class="form-grid"><label>Name<input name="name" required /></label><label>Kind<select name="kind"><option>Tool</option><option>Consumable</option><option>Spare part</option><option>Safety gear</option></select></label><label>Quantity<input name="qty" type="number" min="0" value="1" required /></label><label>Reorder at (min)<input name="minQty" type="number" min="0" /></label><label>Location / bin<input name="location" /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Usual vendor<input name="vendor" /></label><label>Training needed<select name="training" id="stock-training"></select></label><button>Add item</button></form></div>
       </section>
 
       <section id="budget" class="view">
@@ -95,6 +140,31 @@
           <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><label>Spent ($)<input name="spent" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
         </div>
         <div class="card"><h2>Budget overview</h2><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">FSAE COST EVENT</p><h2>Cost report</h2></div><div class="filters"><div class="seg" id="cost-car"><button data-car="EV">EV car</button><button data-car="ICE">ICE car</button></div><label class="inline">Shop rate $/h <input id="shop-rate" type="number" min="0" step="1" class="narrow" /></label><button class="secondary" id="cost-export">Export CSV</button></div></div>
+          <p class="hint">Rolled up from the BOM: material, process (incl. linked shop-job hours × shop rate), fasteners, tooling. A starting point. Check it against this season's cost rules and official tables before submitting.</p>
+          <div class="table-wrap"><table class="compact cost-table"><thead><tr><th>P/N</th><th>Part</th><th>Material</th><th>Process</th><th>Fasteners</th><th>Tooling</th><th>Total</th><th>Share</th></tr></thead><tbody id="cost-body"></tbody><tfoot><tr id="cost-total"></tr></tfoot></table></div>
+          <p id="cost-note" class="hint"></p></div>
+      </section>
+
+      <section id="documents" class="view">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">PROCESS</p><h2>Document control</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-docs" class="flow short"></div></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">COMPETITION</p><h2>Deliverables</h2></div><div id="deliverables-progress" class="progress-row deliv-progress"></div></div>
+          <p class="hint">Link each deliverable to its document. It counts as ready once that document is released. Set the due dates from this season's rules and event calendar.</p>
+          <div class="table-wrap"><table class="compact deliv-table"><thead><tr><th>Deliverable</th><th>Document</th><th>Due</th><th>State</th></tr></thead><tbody id="deliverables-body"></tbody></table></div></div>
+        <div class="card"><p class="eyebrow">REGISTER</p><h2>Register a document</h2>
+          <form id="doc-form" class="form-grid">
+            <label>Title<input name="title" required placeholder="e.g. Rear rocker drawing" /></label>
+            <label>Type<select name="type" id="doc-type"></select></label>
+            <label>Revision<input name="revision" placeholder="A" /></label>
+            <label>Subteam<select name="subteam" id="doc-subteam"></select></label>
+            <label>Part<select name="partId" id="doc-part"></select></label>
+            <label>Project<select name="projectId" id="doc-project"></select></label>
+            <label class="wide">Link to file<input name="url" type="url" placeholder="https://drive.google.com/… or your PDM / OneDrive link" /></label>
+            <button>Register document</button>
+          </form>
+        </div>
+        <div class="card"><div class="list-header"><div><h2>Document register</h2></div><div class="filters"><span id="docs-count" class="pill"></span><select id="doc-filter-type"></select><input id="doc-search" type="search" placeholder="Search documents" /></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Number</th><th>Title</th><th>Type</th><th>Rev</th><th>Linked to</th><th>Owner</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody id="docs-body"></tbody></table></div><p id="docs-empty" class="empty">No documents match.</p></div>
       </section>
 
       <section id="approvals" class="view">
@@ -113,15 +183,21 @@
           <form id="member-form" class="form-grid"><label>Name<input name="name" required /></label><label>Title<select name="title" id="member-title"></select></label><label>Leads subteam<select name="lead" id="member-lead"></select></label><fieldset class="roles-pick wide"><legend>Subteams</legend><div id="member-subteams" class="checks"></div></fieldset><fieldset class="roles-pick"><legend>Permissions</legend><div id="member-roles"></div></fieldset><button>Add member</button></form>
         </div>
         <div class="card"><div class="list-header"><h2>Roster</h2><span id="team-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Title</th><th>Subteams</th><th>Permissions</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
-        <div class="card"><p class="eyebrow">WHO CAN DO WHAT</p><h2>Roles</h2><ul id="role-guide" class="role-guide"></ul><p class="hint">Roles only control what this page lets you do. Anyone with the file can still change the stored data, so this isn't security until there's a backend with real logins.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">SHOP SAFETY</p><h2>Training sign-offs</h2></div><select id="training-subteam" aria-label="Filter by subteam"></select></div>
+          <p id="training-note" class="hint"></p>
+          <div class="table-wrap"><table class="compact training"><thead id="training-head"></thead><tbody id="training-body"></tbody></table></div></div>
+        <div class="card"><p class="eyebrow">WHO CAN DO WHAT</p><h2>Roles</h2><ul id="role-guide" class="role-guide"></ul><p class="hint">A job can't start until its machinist is signed off on that machine (see Training below). Roles only control what this page lets you do. Anyone with the file can still change the stored data, so this isn't security until there's a backend with real logins.</p></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
     <link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css" />
     <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
     <script src="flow.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <script src="app.js"></script>
+    <script src="ops.js"></script>
   </body>
 </html>

@@ -1,5 +1,11 @@
-const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchases", jobs: "motorsport-erp-jobs", budgets: "motorsport-erp-budgets", approvals: "motorsport-erp-approvals", team: "motorsport-erp-team", projects: "motorsport-erp-projects", tasks: "motorsport-erp-tasks", log: "motorsport-erp-log", me: "motorsport-erp-current-user" };
+const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchases", jobs: "motorsport-erp-jobs", budgets: "motorsport-erp-budgets", approvals: "motorsport-erp-approvals", team: "motorsport-erp-team", projects: "motorsport-erp-projects", docs: "motorsport-erp-docs", deliverables: "motorsport-erp-deliverables", tasks: "motorsport-erp-tasks", log: "motorsport-erp-log", me: "motorsport-erp-current-user" };
 const $ = (selector) => document.querySelector(selector);
+// Hooks that ops.js (loaded after this file) plugs into.
+const EXT = { renders: [], seeds: [], can: [], before: [], after: [], inbox: [], projectExtras: [], rowButtons: [] };
+// Stages an item can't advance past (no wrapping back to the start).
+const FINAL = { purchases: "Received", jobs: "Complete", approvals: "Approved", projects: "Complete", docs: "Released" };
+// Purchases above this amount need leadership (President / VP / Chief Mechanic) to approve the quote.
+const PURCHASE_LEADERSHIP_LIMIT = 500;
 const read = (key) => { try { return JSON.parse(localStorage.getItem(KEYS[key])) || []; } catch { return []; } };
 const write = (key, value) => localStorage.setItem(KEYS[key], JSON.stringify(value));
 const id = () => crypto.randomUUID();
@@ -48,13 +54,16 @@ const onProject = (p, u = me()) => p.pocId === u.id || p.createdBy === u.id || (
 function can(action, key, row) {
   const u = me();
   if (!u.id) return false;
+  if (action === "advance" && row && FINAL[key] && row.status === FINAL[key]) return false;
   const isAdmin = u.roles.includes("Admin");
   switch (`${action}:${key}`) {
     case "create:parts": case "create:purchases": case "create:jobs": case "create:approvals": return true;
     case "create:budgets": case "delete:budgets": return has("Budget Manager");
     case "advance:parts": return true;
     case "delete:parts": case "reparent:parts": return row ? leads(row.subsystem) : SUBSYSTEMS.some((s) => leads(s));
-    case "advance:purchases": return has("Purchasing Approver") && (isAdmin || !own(row));
+    case "advance:purchases":
+      if (row && row.status === "Quoted" && Number(row.amount) > PURCHASE_LEADERSHIP_LIMIT) return isLeader(u) && (isAdmin || !own(row));
+      return has("Purchasing Approver") && (isAdmin || !own(row));
     case "delete:purchases": return has("Purchasing Approver") || (own(row) && row.status === "Requested");
     case "advance:jobs": case "delete:jobs": return has("Shop Lead");
     case "advance:approvals": return has("Design Review Approver") && (isAdmin || !own(row));
@@ -77,11 +86,23 @@ function can(action, key, row) {
     case "create:tasks": return !!row && (onProject(row, u) || ledSub(row.subteam, u) || isLeader(u));
     case "advance:tasks": { const p = projectOf(row); return !!p && (row.assigneeId === u.id || p.pocId === u.id || ledSub(p.subteam, u) || isLeader(u)); }
     case "delete:tasks": { const p = projectOf(row); return !!p && (p.pocId === u.id || ledSub(p.subteam, u) || isLeader(u)); }
+    // BOM import is a bulk change, so it's limited to leads.
+    case "import:parts": return isAdmin || u.roles.includes("Subteam Lead");
+    // Documents: anyone registers; author (or lead) sends for review; a Design Review Approver or the subteam lead releases (not the author).
+    case "create:docs": return true;
+    case "advance:docs": {
+      if (!row) return true;
+      if (row.status === "Draft") return row.ownerId === u.id || own(row) || ledSub(row.subteam, u) || isAdmin;
+      if (row.status === "In Review") return (has("Design Review Approver") || ledSub(row.subteam, u)) && (isAdmin || (row.ownerId !== u.id && !own(row)));
+      return false;
+    }
+    case "revise:docs": return row?.status === "Released" && (row.ownerId === u.id || ledSub(row.subteam, u) || isAdmin);
+    case "delete:docs": return isAdmin || ledSub(row?.subteam, u) || (!!row && row.ownerId === u.id && row.status === "Draft");
     case "manage:team": return isAdmin;
-    default: return false;
+    default: { for (const f of EXT.can) { const r = f(action, key, row, u); if (r !== undefined) return r; } return false; }
   }
 }
-const whyNot = { "advance:purchases": "Needs Purchasing Approver (and not your own request)", "advance:approvals": "Needs Design Review Approver (and not your own submission)", "advance:jobs": "Needs Shop Lead", "create:budgets": "Needs Budget Manager" };
+const whyNot = { "advance:purchases": `Needs Purchasing Approver (and not your own request). Quotes over ${PURCHASE_LEADERSHIP_LIMIT} need the President, VP or Chief Mechanic.`, "advance:approvals": "Needs Design Review Approver (and not your own submission)", "advance:jobs": "Needs Shop Lead", "create:budgets": "Needs Budget Manager" };
 
 function logEvent(text) {
   write("log", [...read("log"), { id: id(), who: me().name, text, at: new Date().toISOString() }].slice(-200));
@@ -217,6 +238,8 @@ function loadDemoData() {
   const idByName = Object.fromEntries(team.map((m) => [m.name, m.id]));
   Object.entries(demoData).forEach(([key, rows]) => write(key, rows.map(({ by, ...row }) => ({ ...row, id: id(), createdAt: new Date().toISOString(), createdBy: idByName[by] || "" }))));
   seedProjects(team);
+  seedDocs(team);
+  EXT.seeds.forEach((f) => f(team));
   localStorage.setItem(KEYS.me, team[0].id);
   write("log", []);
   logEvent("loaded demo data");
@@ -251,9 +274,46 @@ function seedProjects(team) {
   });
   write("projects", projects); write("tasks", tasks);
 }
+function seedDocs(team) {
+  const parts = read("parts"); const projects = read("projects");
+  const prefix = { Powertrain: "PWT", Suspension: "SUS", Brakes: "BRK", Electronics: "ELE", Chassis: "CHS", Aero: "AER", Other: "OTH" }; const counter = {};
+  const costs = { "Wheel bearing": 42, "Damper": 410, "Master cylinder": 95, "Caliper": 260, "Brake rotor": 88, "Cell modules": 1450, "BMS": 620, "Inverter": 3900, "Traction motor": 5200, "Engine (600cc)": 2400, "Fuel pump": 140, "ECU": 1100, "Radiator": 180, "LV battery": 230, "CAN node board": 35, "Dash display": 310, "Halfshafts": 190, "Steering rack": 520, "Driver seat": 150 };
+  parts.forEach((p) => { const pre = prefix[p.subsystem] || "OTH"; counter[pre] = (counter[pre] || 1000) + 10; p.partNumber = `${pre}-${counter[pre]}`; if (costs[p.name]) p.unitCost = String(costs[p.name]); });
+  write("parts", parts);
+  const partId = (n) => parts.find((p) => p.name === n)?.id || ""; const projId = (n) => projects.find((p) => p.name === n)?.id || "";
+  const ownerFor = (sub, k) => { const m = team.filter((x) => (x.subteams || []).includes(sub) && !(x.leads || []).includes(sub)); return (m[k % Math.max(1, m.length)] || team.find((x) => (x.leads || []).includes(sub)) || team[0]).id; };
+  const leadOf = (sub) => team.find((x) => (x.leads || []).includes(sub))?.id || "";
+  // [title, type, revision, status, part, project, subteam, earlier released revisions]
+  const demo = [
+    ["Front upright drawing", "Drawing", "C", "Released", "Front upright", "Lightweight front upright", "Suspension", ["A", "B"]],
+    ["Front upright FEA report", "Analysis (FEA/CFD)", "B", "In Review", "Front upright", "Lightweight front upright", "Suspension", ["A"]],
+    ["Accumulator segment thermal test", "Test report", "A", "In Review", "Accumulator", "Accumulator cooling redesign", "EV Powertrain", []],
+    ["Accumulator enclosure drawing", "Drawing", "C", "Released", "Accumulator enclosure", "", "EV Powertrain", ["A", "B"]],
+    ["Shutdown circuit schematic", "Drawing", "A", "Released", "Shutdown circuit", "", "Low Voltage", []],
+    ["Structural Equivalency Spreadsheet", "Rules compliance", "2", "Draft", "Steel spaceframe", "", "Frame", ["1"]],
+    ["Impact attenuator test data", "Test report", "1", "Released", "Front impact attenuator", "", "Frame", []],
+    ["Electrical System Form", "Rules compliance", "1", "In Review", "", "", "Low Voltage", []],
+    ["Cost report 2026-27", "Cost report", "A", "Draft", "", "", "Business", []],
+    ["Restrictor profile CFD comparison", "Analysis (FEA/CFD)", "A", "Draft", "Intake & restrictor", "Restrictor CFD study", "Combustion", []],
+    ["Sponsor tier sheet", "Presentation", "A", "Draft", "", "Sponsor outreach packet", "Business", []],
+    ["Torque wrench calibration SOP", "Procedure / SOP", "B", "Released", "", "", "Manufacturing", ["A"]],
+    ["Inverter datasheet", "Datasheet", "A", "Released", "Inverter", "", "EV Powertrain", []]
+  ];
+  const now = Date.now();
+  const docs = demo.map(([title, type, revision, status, part, project, subteam, prior], i) => ({
+    id: id(), number: `DOC-${String(i + 1).padStart(4, "0")}`, title, type, revision, status, url: "", partId: partId(part), projectId: projId(project), subteam,
+    ownerId: ownerFor(subteam, i), createdBy: ownerFor(subteam, i), releasedBy: status === "Released" ? leadOf(subteam) : "",
+    history: prior.map((r) => ({ revision: r, status: "Released", at: "", by: leadOf(subteam) })),
+    createdAt: new Date(now - (40 - i) * 864e5).toISOString(), updatedAt: new Date(now - (13 - i) * 864e5).toISOString()
+  }));
+  write("docs", docs);
+  const day = (n) => new Date(now + n * 864e5).toISOString().slice(0, 10);
+  const links = { "Structural Equivalency Spreadsheet (SES)": [5, "Structural Equivalency Spreadsheet"], "Impact Attenuator Data (IAD) report": [12, "Impact attenuator test data"], "Electrical System Form (ESF) — EV": [18, "Electrical System Form"], "Cost report": [40, "Cost report 2026-27"], "Team roster & insurance": [-2, ""], "FMEA — EV": [30, ""], "Design report": [60, ""], "Design spec sheet": [60, ""], "Business presentation": [75, "Sponsor tier sheet"] };
+  write("deliverables", DEFAULT_DELIVERABLES.map((name) => ({ id: id(), name, dueDate: links[name] ? day(links[name][0]) : "", docId: links[name]?.[1] ? docs.find((d) => d.title === links[name][1])?.id || "" : "" })));
+}
 function clearWorkspace() {
   Object.values(KEYS).forEach((key) => localStorage.removeItem(key));
-  ensureTeam();
+  ensureTeam(); ensureDeliverables();
   renderAll();
 }
 function ensureTeam() {
@@ -264,11 +324,14 @@ $("#clear-data").addEventListener("click", clearWorkspace);
 $("#user-select").addEventListener("change", (e) => { localStorage.setItem(KEYS.me, e.target.value); renderAll(); });
 
 // ---------- Renderers ----------
+// "⚙ part · ◆ project · budget" line under a purchase or job.
+const linkLine = (row) => { const part = row.partId && read("parts").find((x) => x.id === row.partId); const proj = row.projectId && read("projects").find((x) => x.id === row.projectId); const bits = [part && `⚙ ${part.name}`, proj && `◆ ${proj.name}`, row.category && `${row.category} budget`].filter(Boolean); return bits.length ? `<div class="hint">${esc(bits.join(" · "))}</div>` : ""; };
 const memberName = (memberId) => read("team").find((m) => m.id === memberId)?.name || "—";
 const actions = (key, row, advanceLabel = "Advance") => {
   const out = [];
   if (can("advance", key, row)) out.push(`<button class="link" data-action="advance" data-key="${key}" data-id="${row.id}">${advanceLabel}</button>`);
   else if (whyNot[`advance:${key}`]) out.push(`<span class="locked" title="${esc(whyNot[`advance:${key}`])}">🔒</span>`);
+  EXT.rowButtons.forEach((f) => { const b = f(key, row); if (b) out.push(b); });
   if (can("delete", key, row)) out.push(`<button class="link danger" data-action="delete" data-key="${key}" data-id="${row.id}">Delete</button>`);
   return out.join("");
 };
@@ -283,23 +346,26 @@ function renderUser() {
 function renderParts() {
   const query = ($("#part-search")?.value || "").trim().toLowerCase();
   const rows = read("parts").filter((part) => Object.values(part).join(" ").toLowerCase().includes(query));
-  $("#parts-body").innerHTML = rows.map((part) => `<tr><td>${esc(part.name)}</td><td>${esc(part.subsystem)}</td><td><span class="plat ${platformOf(part).toLowerCase()}">${esc(platformOf(part))}</span></td><td>${esc(part.quantity)}</td><td>${esc(part.location)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
+  $("#parts-body").innerHTML = rows.map((part) => `<tr><td class="mono">${esc(part.partNumber || "—")}</td><td>${esc(part.name)}</td><td>${esc(part.subsystem)}</td><td><span class="plat ${platformOf(part).toLowerCase()}">${esc(platformOf(part))}</span></td><td>${esc(part.quantity)}</td><td>${part.unitCost ? money(part.unitCost) : "—"}</td><td>${esc(part.location)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
   $("#parts-empty").style.display = rows.length ? "none" : "block";
 }
 function renderPurchases() {
   const rows = read("purchases");
-  $("#purchases-body").innerHTML = rows.map((item) => `<tr><td>${esc(item.item)}</td><td>${esc(item.vendor)}</td><td>${money(item.amount)}</td><td>${esc(item.neededBy)}</td><td>${esc(memberName(item.createdBy))}</td><td><span class="status">${esc(item.status)}</span></td><td>${actions("purchases", item)}</td></tr>`).join("");
+  const today = new Date().toISOString().slice(0, 10);
+  $("#purchases-body").innerHTML = rows.map((item) => `<tr><td>${esc(item.item)}${linkLine(item)}</td><td>${esc(item.vendor)}</td><td>${money(item.amount)}${Number(item.amount) > PURCHASE_LEADERSHIP_LIMIT && ["Requested", "Quoted"].includes(item.status) ? `<div class="hint">needs leadership</div>` : ""}</td><td class="${item.neededBy && item.neededBy < today && !["Received"].includes(item.status) ? "overdue-text" : ""}">${esc(item.neededBy)}</td><td>${esc(memberName(item.createdBy))}</td><td><span class="status">${esc(item.status)}</span></td><td>${actions("purchases", item)}</td></tr>`).join("");
   $("#purchases-empty").style.display = rows.length ? "none" : "block";
   $("#vendor-count").textContent = `${new Set(rows.map((item) => item.vendor)).size} vendors`;
 }
 function renderJobs() {
   const rows = read("jobs");
-  $("#jobs-body").innerHTML = rows.map((job) => `<tr><td>${esc(job.name)}</td><td>${esc(job.owner)}</td><td>${esc(job.material)}</td><td>${esc(job.dueDate)}</td><td><span class="priority ${esc(String(job.priority).toLowerCase())}">${esc(job.priority)}</span></td><td>${esc(job.status)}</td><td>${actions("jobs", job)}</td></tr>`).join("");
+  const today = new Date().toISOString().slice(0, 10);
+  $("#jobs-body").innerHTML = rows.map((job) => `<tr><td>${esc(job.name)}${linkLine(job)}</td><td>${esc(job.ownerId ? memberName(job.ownerId) : job.owner || "—")}</td><td>${esc(job.machine || "—")}${job.hours ? `<div class="hint">${esc(job.hours)} h</div>` : ""}</td><td>${esc(job.material)}</td><td class="${job.dueDate && job.dueDate < today && job.status !== "Complete" ? "overdue-text" : ""}">${esc(job.dueDate)}</td><td><span class="priority ${esc(String(job.priority).toLowerCase())}">${esc(job.priority)}</span></td><td>${esc(job.status)}</td><td>${actions("jobs", job)}</td></tr>`).join("");
   $("#jobs-empty").style.display = rows.length ? "none" : "block";
 }
 function renderBudgets() {
   const rows = read("budgets");
-  $("#budget-list").innerHTML = rows.map((budget) => { const remaining = Number(budget.budget) - Number(budget.spent); const percent = Math.min(100, Number(budget.spent) / Math.max(1, Number(budget.budget)) * 100); return `<div class="budget-row"><div><strong>${esc(budget.category)}</strong><span>${money(budget.spent)} spent of ${money(budget.budget)} · ${money(remaining)} remaining</span></div><div class="progress"><i style="width:${percent}%"></i></div>${can("delete", "budgets", budget) ? `<button class="link danger" data-action="delete" data-key="budgets" data-id="${budget.id}">Remove</button>` : "<span></span>"}</div>`; }).join("");
+  const purchases = read("purchases");
+  $("#budget-list").innerHTML = rows.map((budget) => { const linked = purchases.filter((x) => x.category === budget.category && ["Ordered", "Received"].includes(x.status)); const committed = purchases.filter((x) => x.category === budget.category && ["Approved"].includes(x.status)).reduce((s2, x) => s2 + Number(x.amount || 0), 0); const spent = Number(budget.spent || 0) + linked.reduce((s2, x) => s2 + Number(x.amount || 0), 0); const remaining = Number(budget.budget) - spent; const percent = Math.min(100, spent / Math.max(1, Number(budget.budget)) * 100); return `<div class="budget-row${remaining < 0 ? " over" : ""}"><div><strong>${esc(budget.category)}</strong><span>${money(spent)} spent of ${money(budget.budget)} · ${money(remaining)} remaining${linked.length ? ` · incl. ${linked.length} linked purchase${linked.length > 1 ? "s" : ""}` : ""}${committed ? ` · ${money(committed)} approved, not yet ordered` : ""}</span></div><div class="progress"><i style="width:${percent}%"></i></div>${can("delete", "budgets", budget) ? `<button class="link danger" data-action="delete" data-key="budgets" data-id="${budget.id}">Remove</button>` : "<span></span>"}</div>`; }).join("");
   $("#budget-empty").style.display = rows.length ? "none" : "block";
 }
 function renderApprovals() {
@@ -318,7 +384,11 @@ function renderOverview() {
   const purchases = read("purchases"); const jobs = read("jobs"); const approvals = read("approvals"); const parts = read("parts"); const u = me();
   $("#stats").innerHTML = [["Parts tracked", parts.length, "parts"], ["Open purchases", purchases.filter((x) => x.status !== "Received").length, "requests"], ["Shop queue", jobs.filter((x) => x.status !== "Complete").length, "jobs"], ["Pending approvals", approvals.filter((x) => x.status !== "Approved").length, "reviews"]].map(([label, value, suffix]) => `<div class="stat"><span>${label}</span><strong>${value}</strong><small>${suffix}</small></div>`).join("");
   const projects = read("projects"); const projName = (pid) => projects.find((p) => p.id === pid)?.name || "?";
+  const today = new Date().toISOString().slice(0, 10);
   const inbox = [
+    ...EXT.inbox.flatMap((f) => f(u)),
+    ...read("docs").filter((d) => d.status === "In Review" && can("advance", "docs", d)).map((d) => `Document: ${d.number} ${d.title} Rev ${d.revision} is ready to release`),
+    ...(isLeader(u) ? read("deliverables").filter((x) => x.dueDate && x.dueDate <= new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10) && read("docs").find((d) => d.id === x.docId)?.status !== "Released").map((x) => `Deliverable: ${x.name} ${x.dueDate < today ? "is overdue" : "is due " + x.dueDate}`) : []),
     ...projects.filter((p) => p.status === "Proposed" && can("advance", "projects", p)).map((p) => `Project proposal: ${p.name} (${p.subteam}) needs approval`),
     ...projects.filter((p) => !p.pocId && !["Proposed", "Rejected", "Complete"].includes(p.status) && can("assignPoc", "projects", p)).map((p) => `Project: ${p.name} needs a POC`),
     ...read("tasks").filter((t) => t.assigneeId === u.id && t.status !== "Done").map((t) => `Task: ${t.title} (${projName(t.projectId)}) is ${t.status}${t.dueDate ? `, due ${t.dueDate}` : ""}`),
@@ -451,6 +521,8 @@ function renderProjects() {
       <div class="people"><span class="label">Team</span>${people}${p.pocId ? "" : `<span class="warn-chip">No POC yet</span>`}</div>
       ${pocCtl || addCtl ? `<div class="assign-row">${pocCtl}${addCtl}</div>` : ""}
       <div class="progress-row"><div class="progress"><i style="width:${pct}%"></i></div><span>${done}/${pt.length} tasks · ${pct}%</span></div>
+      ${EXT.projectExtras.map((f) => f(p)).join("")}
+      ${(() => { const pd = read("docs").filter((d) => d.projectId === p.id); return pd.length ? `<div class="people"><span class="label">Docs</span>${pd.map((d) => `<span class="doc-chip doc-${stageClass(d.status)}" title="${esc(d.title)}">${esc(d.number)} Rev ${esc(d.revision)} · ${esc(d.status)}</span>`).join(" ")}</div>` : ""; })()}
       <details ${pt.length && pt.length <= 6 && p.status !== "Proposed" ? "open" : ""}><summary>Tasks (${pt.length})</summary>${pt.length ? `<div class="table-wrap"><table class="compact"><thead><tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${taskRows}</tbody></table></div>` : `<p class="hint">No tasks yet.</p>`}${taskForm}</details>
       <footer>${btns.join("")}</footer></article>`;
   }).join("");
@@ -466,9 +538,11 @@ document.addEventListener("change", (e) => {
     if (!can("assignPoc", "projects", p)) return flash("Only the subteam lead or leadership can set the POC.");
     p.pocId = poc.value; if (p.pocId && !(p.assignees || []).includes(p.pocId)) p.assignees = [...(p.assignees || []), p.pocId];
     logEvent(p.pocId ? `made ${memberName(p.pocId)} POC of "${p.name}"` : `cleared the POC of "${p.name}"`);
+    if (p.pocId && typeof notify === "function") notify(p.pocId, `You're now POC of "${p.name}"`);
   } else {
     if (!add.value || !can("assign", "projects", p)) return;
     p.assignees = [...new Set([...(p.assignees || []), add.value])]; logEvent(`assigned ${memberName(add.value)} to "${p.name}"`);
+    if (typeof notify === "function") notify(add.value, `You were added to project "${p.name}"`);
   }
   write("projects", projects); renderAll();
 });
@@ -479,7 +553,9 @@ document.addEventListener("submit", (e) => {
   if (!can("create", "tasks", p)) return flash("Only people on this project can add tasks.");
   const v = formValues(form);
   write("tasks", [...read("tasks"), { id: id(), projectId: p.id, title: v.title, assigneeId: v.assigneeId, dueDate: v.dueDate, status: "To Do", createdBy: me().id, createdAt: new Date().toISOString() }]);
-  logEvent(`added task "${v.title}" to "${p.name}" for ${memberName(v.assigneeId)}`); renderAll();
+  logEvent(`added task "${v.title}" to "${p.name}" for ${memberName(v.assigneeId)}`);
+  if (typeof notify === "function") notify(v.assigneeId, `New task for you: "${v.title}" (${p.name})${v.dueDate ? `, due ${v.dueDate}` : ""}`);
+  renderAll();
 });
 $("#project-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -488,6 +564,185 @@ $("#project-form").addEventListener("submit", (e) => {
   write("projects", [...read("projects"), project]); logEvent(`proposed project "${project.name}" for ${project.subteam}`); e.target.reset(); renderAll();
 });
 
+// ---------- BOM import / export ----------
+// Accepts CSV (file or paste) from a CAD/PLM export or spreadsheet. Columns are matched by header name and can be
+// remapped in the preview. An indented BOM (a "Level" column) is turned into parent links automatically.
+const BOM_FIELDS = {
+  partNumber: ["part number", "part no", "part no.", "pn", "p/n", "part #", "number", "item number"],
+  name: ["name", "part name", "description", "part", "item", "title"],
+  quantity: ["qty", "quantity", "count", "qty per"],
+  parent: ["parent", "assembly", "parent assembly", "next assy", "next assembly", "parent part"],
+  level: ["level", "lvl", "indent", "bom level"],
+  subsystem: ["subsystem", "system", "subteam", "category"],
+  platform: ["platform", "car", "vehicle", "used on", "variant"],
+  unitCost: ["unit cost", "cost", "price", "unit price", "cost each"],
+  material: ["material", "mat'l"],
+  supplier: ["supplier", "vendor", "source", "manufacturer"],
+  location: ["location", "bin", "storage"],
+  status: ["status", "state", "lifecycle"]
+};
+const BOM_LABELS = { partNumber: "Part number", name: "Name", quantity: "Qty", parent: "Parent", level: "Level", subsystem: "Subsystem", platform: "Used on", unitCost: "Unit cost", material: "Material", supplier: "Supplier", location: "Location", status: "Status" };
+let bomPreview = null;
+
+function parseCSV(text) {
+  const rows = []; let row = []; let cell = ""; let quoted = false;
+  const delim = (text.split("\n")[0].match(/\t/g) || []).length > (text.split("\n")[0].match(/,/g) || []).length ? "\t" : ",";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch; }
+    else if (ch === '"') quoted = true;
+    else if (ch === delim) { row.push(cell.trim()); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell.trim()); if (row.some((c) => c !== "")) rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  row.push(cell.trim()); if (row.some((c) => c !== "")) rows.push(row);
+  return rows;
+}
+function guessMapping(headers) {
+  const map = {};
+  headers.forEach((h, i) => { const key = h.toLowerCase().replace(/\s+/g, " ").trim(); const field = Object.keys(BOM_FIELDS).find((f) => BOM_FIELDS[f].includes(key) && !(f in map)); if (field) map[field] = i; });
+  return map;
+}
+const normPlatform = (v) => { const s = String(v || "").toLowerCase(); const ev = /\bev\b|electric/.test(s); const ice = /\bice\b|combustion|ic\b/.test(s); return ev && !ice ? "EV" : ice && !ev ? "ICE" : "Both"; };
+const normSubsystem = (v) => { const s = String(v || "").trim(); const hit = [...SUBSYSTEMS, "Other"].find((x) => x.toLowerCase() === s.toLowerCase()); return hit || SUBTEAMS[Object.keys(SUBTEAMS).find((t) => t.toLowerCase() === s.toLowerCase())]?.subsystem || (s ? "Other" : "Other"); };
+const normStatus = (v) => next.parts.find((x) => x.toLowerCase() === String(v || "").trim().toLowerCase()) || "In Design";
+
+function bomRowsToParts(preview) {
+  const { rows, mapping } = preview; const get = (r, f) => (mapping[f] !== undefined && mapping[f] !== "" ? r[mapping[f]] ?? "" : "");
+  const stack = []; const out = [];
+  rows.forEach((r) => {
+    const name = get(r, "name") || get(r, "partNumber"); if (!name) return;
+    let parent = get(r, "parent");
+    if (!parent && mapping.level !== undefined && mapping.level !== "") {
+      const lvl = Math.max(0, parseInt(get(r, "level"), 10) || 0);
+      stack.length = lvl; parent = lvl > 0 ? stack[lvl - 1] || "" : ""; stack[lvl] = name;
+    }
+    out.push({ name, partNumber: get(r, "partNumber"), quantity: String(parseInt(get(r, "quantity"), 10) || 1), parent, subsystem: normSubsystem(get(r, "subsystem")), platform: normPlatform(get(r, "platform")), unitCost: String(parseFloat(String(get(r, "unitCost")).replace(/[^0-9.]/g, "")) || ""), material: get(r, "material"), supplier: get(r, "supplier"), location: get(r, "location") || "Unassigned", status: normStatus(get(r, "status")) });
+  });
+  // Parent may be given as a part number; translate to the part's name so the tree links up.
+  const nameByPn = Object.fromEntries([...read("parts"), ...out].filter((p) => p.partNumber).map((p) => [p.partNumber, p.name]));
+  out.forEach((p) => { if (p.parent && nameByPn[p.parent]) p.parent = nameByPn[p.parent]; });
+  return out;
+}
+function loadBomText(text, source) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) { flash("That BOM needs a header row and at least one part."); return; }
+  const headers = rows[0]; bomPreview = { headers, rows: rows.slice(1), mapping: guessMapping(headers), source };
+  renderBomPreview();
+}
+function renderBomPreview() {
+  const box = $("#bom-preview");
+  if (!bomPreview) { box.innerHTML = ""; return; }
+  const { headers, mapping, source } = bomPreview; const parts = bomRowsToParts(bomPreview);
+  const existing = read("parts"); const pnSet = new Set(existing.filter((p) => p.partNumber).map((p) => p.partNumber));
+  const updates = parts.filter((p) => p.partNumber && pnSet.has(p.partNumber)).length;
+  const missingParents = parts.filter((p) => p.parent && !parts.some((q) => q.name === p.parent) && !existing.some((q) => q.name === p.parent)).length;
+  const selects = Object.keys(BOM_FIELDS).map((f) => `<label>${BOM_LABELS[f]}${f === "name" ? " *" : ""}<select data-bom-field="${f}"><option value="">— skip —</option>${headers.map((h, i) => `<option value="${i}" ${mapping[f] === i ? "selected" : ""}>${esc(h)}</option>`).join("")}</select></label>`).join("");
+  const total = parts.reduce((s, p) => s + (Number(p.unitCost) || 0) * Number(p.quantity), 0);
+  box.innerHTML = `
+    <div class="bom-summary"><strong>${parts.length} parts</strong> from ${esc(source)} · ${updates} match existing part numbers · BOM cost ${money(total)}${missingParents ? ` · <span class="warn-chip">${missingParents} parent${missingParents > 1 ? "s" : ""} not found (they'll sit at top level)</span>` : ""}</div>
+    <details open><summary>Column mapping</summary><div class="form-grid bom-map">${selects}</div></details>
+    <div class="table-wrap"><table class="compact"><thead><tr><th>P/N</th><th>Name</th><th>Parent</th><th>Qty</th><th>Subsystem</th><th>Used on</th><th>Unit cost</th></tr></thead><tbody>${parts.slice(0, 12).map((p) => `<tr><td>${esc(p.partNumber || "—")}</td><td>${esc(p.name)}</td><td>${esc(p.parent || "—")}</td><td>${esc(p.quantity)}</td><td>${esc(p.subsystem)}</td><td><span class="plat ${p.platform.toLowerCase()}">${p.platform}</span></td><td>${p.unitCost ? money(p.unitCost) : "—"}</td></tr>`).join("")}</tbody></table></div>
+    ${parts.length > 12 ? `<p class="hint">…and ${parts.length - 12} more</p>` : ""}
+    <div class="bom-actions"><label class="check"><input type="checkbox" id="bom-merge" checked />Update parts whose part number already exists (otherwise add everything as new)</label><button id="bom-import" ${parts.length ? "" : "disabled"}>Import ${parts.length} parts</button><button class="ghost" id="bom-cancel">Cancel</button></div>`;
+}
+function importBom() {
+  if (!can("import", "parts")) { flash("Only Subteam Leads or an Admin can bulk-import a BOM."); return; }
+  const incoming = bomRowsToParts(bomPreview); const merge = $("#bom-merge").checked; const parts = read("parts");
+  let added = 0, updated = 0;
+  incoming.forEach((p) => {
+    const hit = merge && p.partNumber && parts.find((x) => x.partNumber === p.partNumber);
+    if (hit) { Object.entries(p).forEach(([k, v]) => { if (v !== "" && !(k === "location" && v === "Unassigned")) hit[k] = v; }); updated++; }
+    else { parts.push({ ...p, id: id(), createdAt: new Date().toISOString(), createdBy: me().id }); added++; }
+  });
+  write("parts", parts); logEvent(`imported a BOM from ${bomPreview.source}: ${added} added, ${updated} updated`);
+  flash(`BOM imported: ${added} added, ${updated} updated.`); bomPreview = null; renderAll();
+}
+function downloadFile(name, text, type = "text/csv") {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const csvCell = (v) => /[",\n]/.test(String(v ?? "")) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? "");
+function exportBom() {
+  const cols = ["partNumber", "name", "parent", "quantity", "subsystem", "platform", "unitCost", "material", "supplier", "location", "status"];
+  const lines = [cols.map((c) => BOM_LABELS[c] || c).join(","), ...read("parts").map((p) => cols.map((c) => csvCell(p[c])).join(","))];
+  downloadFile(`bom-${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n")); logEvent("exported the BOM");
+}
+const BOM_TEMPLATE = "Level,Part Number,Description,Qty,Subsystem,Used On,Unit Cost,Material,Supplier\n0,SUS-1000,Front suspension assembly,1,Suspension,Both,,,\n1,SUS-1100,Front upright,2,Suspension,Both,320,7075-T6,In-house\n2,SUS-1110,Wheel bearing,2,Suspension,Both,45,,SKF-style vendor\n1,SUS-1200,Upper wishbone,2,Suspension,Both,60,4130 tube,In-house\n";
+$("#bom-file").addEventListener("change", (e) => { const f = e.target.files[0]; if (!f) return; f.text().then((t) => loadBomText(t, f.name)); e.target.value = ""; });
+$("#bom-paste-go").addEventListener("click", () => { const t = $("#bom-paste").value.trim(); if (t) loadBomText(t, "pasted text"); });
+$("#bom-template").addEventListener("click", () => downloadFile("bom-template.csv", BOM_TEMPLATE));
+$("#bom-export").addEventListener("click", exportBom);
+document.addEventListener("change", (e) => { const sel = e.target.closest("[data-bom-field]"); if (!sel || !bomPreview) return; const f = sel.dataset.bomField; if (sel.value === "") delete bomPreview.mapping[f]; else bomPreview.mapping[f] = Number(sel.value); renderBomPreview(); });
+document.addEventListener("click", (e) => { if (e.target.id === "bom-import") importBom(); if (e.target.id === "bom-cancel") { bomPreview = null; renderBomPreview(); } });
+
+// ---------- Documents ----------
+// A register of controlled documents (drawings, analyses, test reports, rules paperwork...). Files live wherever the team
+// keeps them (Drive, OneDrive, PDM); this tracks number, revision, status, owner, and what part/project each belongs to.
+const DOC_TYPES = ["Drawing", "CAD model", "Analysis (FEA/CFD)", "Test report", "Design spec", "Rules compliance", "Cost report", "Procedure / SOP", "Datasheet", "Quote / invoice", "Sponsor agreement", "Presentation"];
+let docQuery = ""; let docType = "";
+const nextRev = (r) => { const s = String(r || "A").trim(); const m = s.match(/^(.*?)(\d+)$/); if (m) return m[1] + (Number(m[2]) + 1); const l = s.match(/^(.*?)([A-Y])$/i); return l ? l[1] + String.fromCharCode(l[2].charCodeAt(0) + 1) : s + "-1"; };
+const docNumber = () => `DOC-${String(read("docs").reduce((n, d) => Math.max(n, parseInt(String(d.number).replace(/\D/g, ""), 10) || 0), 0) + 1).padStart(4, "0")}`;
+const docLinkLabel = (d) => { const part = d.partId && read("parts").find((p) => p.id === d.partId); const proj = d.projectId && read("projects").find((p) => p.id === d.projectId); return [part && `⚙ ${part.name}`, proj && `◆ ${proj.name}`].filter(Boolean).join(" · ") || "—"; };
+const safeUrl = (u) => /^(https?:|file:|mailto:)/i.test(String(u || "").trim()) ? String(u).trim() : "";
+function renderDocForm() {
+  const fill = (sel, html) => { const el = $(sel); const cur = el.value; el.innerHTML = html; el.value = cur; };
+  fill("#doc-type", DOC_TYPES.map((t) => `<option>${esc(t)}</option>`).join(""));
+  fill("#doc-subteam", `<option value="">—</option>` + Object.keys(SUBTEAMS).map((t) => `<option>${esc(t)}</option>`).join(""));
+  fill("#doc-part", `<option value="">— None —</option>` + [...read("parts")].sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}">${esc(p.name)}${p.partNumber ? ` (${esc(p.partNumber)})` : ""}</option>`).join(""));
+  fill("#doc-project", `<option value="">— None —</option>` + read("projects").map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join(""));
+  fill("#doc-filter-type", `<option value="">All types</option>` + DOC_TYPES.map((t) => `<option>${esc(t)}</option>`).join(""));
+}
+function renderDocs() {
+  const docs = read("docs").filter((d) => (!docType || d.type === docType) && (!docQuery || [d.number, d.title, d.type, docLinkLabel(d), memberName(d.ownerId)].join(" ").toLowerCase().includes(docQuery)));
+  $("#docs-body").innerHTML = docs.map((d) => {
+    const url = safeUrl(d.url); const acts = [];
+    if (url) acts.push(`<a class="link-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>`);
+    if (d.status !== "Released" && can("advance", "docs", d)) acts.push(`<button class="link" data-action="advance" data-key="docs" data-id="${d.id}">${d.status === "Draft" ? "Send for review" : "Release"}</button>`);
+    else if (d.status === "In Review") acts.push(`<span class="locked" title="Needs a Design Review Approver or the subteam lead (not the author)">🔒</span>`);
+    if (d.status === "Released" && can("revise", "docs", d)) acts.push(`<button class="link" data-action="revise" data-key="docs" data-id="${d.id}">New rev</button>`);
+    if (can("delete", "docs", d)) acts.push(`<button class="link danger" data-action="delete" data-key="docs" data-id="${d.id}">Delete</button>`);
+    const hist = (d.history || []).map((h) => `${h.revision} ${h.status}`).join(" → ");
+    return `<tr><td class="mono">${esc(d.number)}</td><td><strong>${esc(d.title)}</strong>${hist ? `<div class="hint">History: ${esc(hist)}</div>` : ""}</td><td>${esc(d.type)}</td><td class="mono">${esc(d.revision)}</td><td>${esc(docLinkLabel(d))}</td><td>${esc(memberName(d.ownerId))}</td><td><span class="status doc-${stageClass(d.status)}">${esc(d.status)}</span></td><td class="mono">${esc((d.updatedAt || "").slice(0, 10))}</td><td>${acts.join("")}</td></tr>`;
+  }).join("");
+  $("#docs-empty").style.display = docs.length ? "none" : "block";
+  $("#docs-count").textContent = `${read("docs").length} documents`;
+}
+$("#doc-search").addEventListener("input", (e) => { docQuery = e.target.value.trim().toLowerCase(); renderDocs(); });
+$("#doc-filter-type").addEventListener("change", (e) => { docType = e.target.value; renderDocs(); });
+$("#doc-form").addEventListener("submit", (e) => {
+  e.preventDefault(); const v = formValues(e.target);
+  if (v.url && !safeUrl(v.url)) { flash("Links must start with https://, http://, file: or mailto:"); return; }
+  const doc = { id: id(), number: docNumber(), title: v.title, type: v.type, revision: v.revision || "A", url: v.url, partId: v.partId, projectId: v.projectId, subteam: v.subteam, ownerId: me().id, status: "Draft", history: [], createdBy: me().id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  write("docs", [...read("docs"), doc]); logEvent(`registered ${doc.number} "${doc.title}" Rev ${doc.revision}`); e.target.reset(); renderAll();
+});
+
+// ---------- Competition deliverables ----------
+// Checklist of paperwork due for competition; each item points at a document in the register and shows whether it's released.
+const DEFAULT_DELIVERABLES = ["Structural Equivalency Spreadsheet (SES)", "Impact Attenuator Data (IAD) report", "Electrical System Form (ESF) — EV", "FMEA — EV", "Cost report", "Design report", "Design spec sheet", "Business presentation", "Team roster & insurance"];
+function renderDeliverables() {
+  const list = read("deliverables"); const docs = read("docs"); const manage = isLeader(me()) || (me().leads || []).length > 0; const today = new Date().toISOString().slice(0, 10);
+  $("#deliverables-body").innerHTML = list.map((x) => {
+    const doc = docs.find((d) => d.id === x.docId);
+    const state = !doc ? "Missing" : doc.status === "Released" ? "Ready" : doc.status;
+    const days = x.dueDate ? Math.round((new Date(x.dueDate) - new Date(today)) / 864e5) : null;
+    const dueCls = state !== "Ready" && days !== null ? (days < 0 ? "overdue" : days <= 21 ? "soon" : "") : "";
+    const docCell = manage ? `<select data-deliv-doc="${x.id}"><option value="">— Link a document —</option>${docs.map((d) => `<option value="${d.id}" ${d.id === x.docId ? "selected" : ""}>${esc(d.number)} · ${esc(d.title)}</option>`).join("")}</select>` : doc ? `${esc(doc.number)} · ${esc(doc.title)}` : "—";
+    const dueCell = manage ? `<input type="date" data-deliv-due="${x.id}" value="${esc(x.dueDate || "")}" />` : esc(x.dueDate || "—");
+    return `<tr><td><strong>${esc(x.name)}</strong></td><td>${docCell}</td><td class="${dueCls}">${dueCell}${dueCls === "overdue" ? `<div class="hint bad">${-days} days overdue</div>` : dueCls === "soon" ? `<div class="hint warn">due in ${days} days</div>` : ""}</td><td><span class="deliv ${stageClass(state)}">${esc(state)}${doc ? ` · Rev ${esc(doc.revision)}` : ""}</span></td></tr>`;
+  }).join("");
+  const ready = list.filter((x) => docs.find((d) => d.id === x.docId)?.status === "Released").length;
+  $("#deliverables-progress").innerHTML = `<div class="progress"><i style="width:${list.length ? ready / list.length * 100 : 0}%"></i></div><span>${ready}/${list.length} ready</span>`;
+}
+document.addEventListener("change", (e) => {
+  const d = e.target.closest("[data-deliv-doc], [data-deliv-due]"); if (!d) return;
+  if (!(isLeader(me()) || (me().leads || []).length)) return flash("Only leads and leadership can edit deliverables.");
+  const list = read("deliverables"); const x = list.find((i) => i.id === (d.dataset.delivDoc || d.dataset.delivDue)); if (!x) return;
+  if (d.dataset.delivDoc !== undefined) { x.docId = d.value; logEvent(`linked "${x.name}" to ${read("docs").find((doc) => doc.id === d.value)?.number || "nothing"}`); }
+  else { x.dueDate = d.value; logEvent(`set "${x.name}" due ${d.value || "(none)"}`); }
+  write("deliverables", list); renderAll();
+});
+function ensureDeliverables() { if (!read("deliverables").length) write("deliverables", DEFAULT_DELIVERABLES.map((name) => ({ id: id(), name, docId: "", dueDate: "" }))); }
+
 // ---------- Process maps (React Flow) ----------
 // Each process: its stages in order, plus the role that moves an item out of each stage.
 const PROCESSES = {
@@ -495,6 +750,7 @@ const PROCESSES = {
   approvals: { view: "approvals", label: (r) => `${r.name} ${r.revision}`, role: "Design Review Approver", loop: "next revision" },
   jobs: { view: "machine-shop", label: (r) => r.name, role: "Shop Lead", loop: "rework" },
   parts: { view: "parts", label: (r) => r.name, role: "Anyone", loop: "rebuild" },
+  docs: { view: "documents", label: (r) => `${r.number} ${r.title} Rev ${r.revision}`, role: ["Author or lead", "Design Review Approver / lead"], loop: "new revision" },
   projects: { view: "projects", label: (r) => r.name, role: ["Subteam lead / leadership", "POC or lead", "POC or lead", "POC or lead"], loop: null }
 };
 function renderProcess(key) {
@@ -506,7 +762,7 @@ function renderProcess(key) {
   const stages = statuses.map((s, i) => ({ id: s, label: s, items: rows.filter((r) => r.status === s).map(cfg.label), final: i === statuses.length - 1 }));
   // "Could I move an item out of stage s?" — tested against a stand-in item in my subteam that someone else created.
   const sample = (s) => ({ status: s, createdBy: "__nobody__", subsystem: me().subsystem, subteam: (me().leads || [])[0] || "", pocId: "__nobody__", assignees: [] });
-  const edges = statuses.slice(0, -1).map((s, i) => ({ from: s, to: statuses[i + 1], label: Array.isArray(cfg.role) ? cfg.role[i] : cfg.role, mine: key === "projects" ? can("advance", key, sample(s)) : mine }));
+  const edges = statuses.slice(0, -1).map((s, i) => ({ from: s, to: statuses[i + 1], label: Array.isArray(cfg.role) ? cfg.role[i] : cfg.role, mine: key === "projects" || key === "docs" ? can("advance", key, sample(s)) : mine }));
   if (cfg.loop) edges.push({ from: statuses[statuses.length - 1], to: statuses[0], label: cfg.loop, mine });
   window.MotorsportFlow.renderProcess(box, { stages, edges });
 }
@@ -527,11 +783,11 @@ $("#org-focus").addEventListener("change", (e) => { orgFocus = e.target.value; r
 
 function flash(text) { const el = $("#toast"); el.textContent = text; el.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.remove("show"), 3200); }
 
-const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProjectForm(); renderProjects(); renderProcesses(); renderOrg(); };
+const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProjectForm(); renderProjects(); renderDocForm(); renderDocs(); renderDeliverables(); renderBomPreview(); renderProcesses(); renderOrg(); EXT.renders.forEach((f) => f()); };
 
 // ---------- Forms & actions ----------
 const labelOf = (key, row) => row.name || row.item || row.category || row.title || "item";
-const nouns = { parts: "part", purchases: "purchase request", jobs: "shop job", budgets: "budget allocation", approvals: "design review", projects: "project", tasks: "task" };
+const nouns = { parts: "part", purchases: "purchase request", jobs: "shop job", budgets: "budget allocation", approvals: "design review", projects: "project", tasks: "task", docs: "document" };
 const setupForm = (selector, key, defaults = {}) => $(selector).addEventListener("submit", (event) => {
   event.preventDefault();
   if (!can("create", key)) { flash("Your roles don't allow this."); return; }
@@ -556,12 +812,13 @@ $("#member-title").innerHTML = `<option value="">Member</option>` + TITLES.map((
 $("#member-roles").innerHTML = Object.keys(ROLES).filter((r) => r !== "Subteam Lead").map((r) => `<label class="check"><input type="checkbox" name="roles" value="${esc(r)}" />${esc(r)}</label>`).join("");
 $("#part-search").addEventListener("input", renderParts);
 
-const next = { parts: ["In Design", "Manufacturing", "In Inventory", "Installed", "Damaged"], purchases: ["Requested", "Quoted", "Approved", "Ordered", "Received"], jobs: ["Queued", "In Progress", "Quality Check", "Complete"], approvals: ["Pending Review", "Changes Requested", "Approved"], projects: ["Proposed", "Approved", "In Progress", "Review", "Complete"], tasks: ["To Do", "In Progress", "Blocked", "Done"] };
+const next = { parts: ["In Design", "Manufacturing", "In Inventory", "Installed", "Damaged"], purchases: ["Requested", "Quoted", "Approved", "Ordered", "Received"], jobs: ["Queued", "In Progress", "Quality Check", "Complete"], approvals: ["Pending Review", "Changes Requested", "Approved"], projects: ["Proposed", "Approved", "In Progress", "Review", "Complete"], tasks: ["To Do", "In Progress", "Blocked", "Done"], docs: ["Draft", "In Review", "Released"] };
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]"); if (!button) return;
   const { action, key } = button.dataset;
   if (action === "remove-member") {
     if (!can("manage", "team")) return;
+    if (!confirm(`Remove ${memberName(button.dataset.id)} from the team?`)) return;
     const team = read("team"); const m = team.find((x) => x.id === button.dataset.id);
     write("team", team.filter((x) => x.id !== button.dataset.id)); logEvent(`removed ${m?.name} from the team`); renderAll(); return;
   }
@@ -571,13 +828,22 @@ document.addEventListener("click", (event) => {
     row.assignees = (row.assignees || []).filter((m) => m !== button.dataset.member); write(key, rows); logEvent(`removed ${memberName(button.dataset.member)} from "${row.name}"`); renderAll(); return;
   }
   if (!can(action, key, row)) { flash("Your roles don't allow this."); return; }
+  for (const f of EXT.before) { const err = f(action, key, row); if (err) { flash(err); return; } }
+  if (action === "delete" && !confirm(`Delete ${nouns[key] || "item"} "${labelOf(key, row)}"? This can't be undone.`)) return;
+  const fromStatus = row.status;
   if (action === "advance") {
     const statuses = next[key];
     const from = row.status;
     row.status = key === "projects" && from === "Rejected" ? "Proposed" : statuses[(statuses.indexOf(from) + 1) % statuses.length];
+    row.updatedAt = new Date().toISOString();
+    if (key === "docs" && row.status === "Released") { row.releasedBy = me().id; }
     if (key === "projects" && from === "Proposed") { row.approvedBy = me().id; row.approvedAt = new Date().toISOString(); }
     write(key, rows);
     logEvent(key === "projects" && from === "Proposed" ? `approved project proposal "${labelOf(key, row)}"` : key === "projects" && from === "Rejected" ? `resubmitted project "${labelOf(key, row)}"` : `moved ${nouns[key]} "${labelOf(key, row)}" to ${row.status}`);
+  } else if (action === "revise") {
+    row.history = [...(row.history || []), { revision: row.revision, status: row.status, at: row.updatedAt, by: row.releasedBy || "" }];
+    const old = row.revision; row.revision = nextRev(row.revision); row.status = "Draft"; row.updatedAt = new Date().toISOString();
+    write(key, rows); logEvent(`started Rev ${row.revision} of ${row.number} "${row.title}" (was Rev ${old})`);
   } else if (action === "reject") {
     row.status = "Rejected"; row.rejectedBy = me().id; write(key, rows); logEvent(`rejected project proposal "${labelOf(key, row)}"`);
   } else if (action === "delete") {
@@ -585,8 +851,10 @@ document.addEventListener("click", (event) => {
     if (key === "projects") write("tasks", read("tasks").filter((t) => t.projectId !== row.id));
     logEvent(`deleted ${nouns[key]} "${labelOf(key, row)}"`);
   }
+  EXT.after.forEach((f) => f(action, key, row, fromStatus));
   renderAll();
 });
 
 ensureTeam();
+ensureDeliverables();
 renderAll();
