@@ -460,3 +460,8 @@ details.menu > summary:hover, details.menu[open] > summary { background: var(--s
 .tl-ms.ev { border-left-color: var(--ev); } .tl-ms.ev span { color: var(--ev); }
 button.x { background: none; border: 0; color: var(--ink-3); padding: 0 4px; margin: 0; font-size: 1rem; line-height: 1; min-height: 0; width: auto; }
 button.x:hover { color: var(--bad); background: none; }
+
+/* Multipage: nav items and a few buttons are links now */
+a.tab { text-decoration: none; }
+a.button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 650; font-size: .86rem; text-decoration: none; }
+a.button:hover { background: var(--surface-2); border-color: var(--ink-3); }

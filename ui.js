@@ -9,9 +9,10 @@
     const h2 = card.querySelector("h2"); if (!h2) return;
     const key = `ui-open:${card.closest("section").id}:${h2.textContent.trim()}`;
     card.classList.add("collapsible", isProcess ? "is-process" : "is-form");
-    if (isProcess) h2.textContent = `How it works: ${h2.textContent.replace(/ process$| lifecycle$/i, "").toLowerCase()}`;
+    if (isProcess && !/^How it works/.test(h2.textContent)) h2.textContent = `How it works: ${h2.textContent.replace(/ process$| lifecycle$/i, "").toLowerCase()}`;
     h2.setAttribute("role", "button"); h2.tabIndex = 0;
-    const set = (open) => { card.classList.toggle("collapsed", !open); h2.setAttribute("aria-expanded", String(open)); store.set(key, open ? "1" : "0"); if (open && isProcess) setTimeout(() => window.dispatchEvent(new Event("resize")), 30); };
+    // Process maps are drawn (and React Flow fetched) only once they're opened.
+    const set = (open) => { card.classList.toggle("collapsed", !open); h2.setAttribute("aria-expanded", String(open)); store.set(key, open ? "1" : "0"); if (open && isProcess && typeof renderProcesses === "function") renderProcesses(); };
     set(store.get(key) === "1");
     const toggle = () => set(card.classList.contains("collapsed"));
     h2.addEventListener("click", toggle);

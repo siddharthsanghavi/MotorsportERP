@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Purchasing · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="purchasing">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab active" href="purchasing.html" aria-current="page"><span>Purchasing</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="purchasing" class="view active">
+        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: purchasing</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-purchases" class="flow short"></div></div>
+        
+        <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>Vendor & purchase request</h2>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Budget<select name="category" id="purchase-category"></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
+        </div>
+        <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

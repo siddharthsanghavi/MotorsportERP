@@ -1,5 +1,8 @@
 const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchases", jobs: "motorsport-erp-jobs", budgets: "motorsport-erp-budgets", approvals: "motorsport-erp-approvals", team: "motorsport-erp-team", projects: "motorsport-erp-projects", docs: "motorsport-erp-docs", deliverables: "motorsport-erp-deliverables", tasks: "motorsport-erp-tasks", log: "motorsport-erp-log", me: "motorsport-erp-current-user" };
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector) => document.querySelector(selector) || document.createElement("div");
+const onPage = (selector) => !!document.querySelector(selector);
+// One HTML file per section. Overview is index.html.
+const PAGE_FILES = { overview: "index.html", projects: "projects.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", budget: "budget.html", team: "team.html" };
 // Hooks that ops.js (loaded after this file) plugs into.
 const EXT = { renders: [], seeds: [], can: [], before: [], after: [], inbox: [], projectExtras: [], rowButtons: [] };
 // Stages an item can't advance past (no wrapping back to the start).
@@ -223,14 +226,31 @@ const demoData = {
 
 // ---------- Navigation ----------
 function showView(view) {
-  document.querySelectorAll(".view").forEach((section) => section.classList.toggle("active", section.id === view));
-  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
-  if (view === "assembly") renderFlow();
-  renderProcesses();
-  if (view === "team") renderOrg();
+  if (onPage(`section#${view}`)) return;
+  location.href = PAGE_FILES[view] || "index.html";
 }
-document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
-document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.go)));
+
+// React Flow (React + ReactDOM + React Flow + flow.js) is only fetched when a map is actually on screen.
+let flowLoading = null;
+function ensureFlow() {
+  if (window.MotorsportFlow?.available) return Promise.resolve(true);
+  if (!flowLoading) {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/reactflow@11.11.4/dist/style.css"; document.head.appendChild(css);
+    const load = (src) => new Promise((resolve, reject) => { const el = document.createElement("script"); el.src = src; el.onload = resolve; el.onerror = () => reject(new Error(src)); document.head.appendChild(el); });
+    flowLoading = load("https://unpkg.com/react@18.3.1/umd/react.production.min.js")
+      .then(() => load("https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"))
+      .then(() => load("https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"))
+      .then(() => load("flow.js"))
+      .then(() => !!window.MotorsportFlow?.available)
+      .catch(() => false);
+  }
+  return flowLoading;
+}
+function withFlow(box, draw) {
+  if (window.MotorsportFlow?.available) return draw();
+  if (!box.dataset.loading) { box.dataset.loading = "1"; box.innerHTML = `<p class="empty">Loading map…</p>`; }
+  ensureFlow().then((ok) => { delete box.dataset.loading; if (ok) draw(); else box.innerHTML = `<p class="empty">The map didn't load. React Flow comes from a CDN, so maps need an internet connection.</p>`; });
+}
 
 function loadDemoData() {
   const team = buildDemoTeam().map((m) => ({ ...m, id: id() }));
@@ -445,7 +465,7 @@ function reparent(childId, parentId) {
 function renderFlow() {
   const box = $("#parts-flow");
   if (assemblyMode !== "graph" || !$("#assembly").classList.contains("active")) return;
-  if (!window.MotorsportFlow?.available) { box.innerHTML = `<p class="empty">React Flow didn't load (it comes from a CDN, so this view needs an internet connection).</p>`; return; }
+  if (!window.MotorsportFlow?.available) return withFlow(box, renderFlow);
   window.MotorsportFlow.render(box, { parts: read("parts"), platform: treePlatform, canReparent: can("reparent", "parts"), onReparent: reparent });
 }
 function renderAssemblyMode() {
@@ -755,8 +775,8 @@ const PROCESSES = {
 };
 function renderProcess(key) {
   const box = $(`#process-${key}`); const cfg = PROCESSES[key];
-  if (!box || !$(`#${cfg.view}`).classList.contains("active")) return;
-  if (!window.MotorsportFlow?.available) { box.innerHTML = `<p class="empty">React Flow didn't load (needs an internet connection).</p>`; return; }
+  if (!onPage(`#process-${key}`) || box.closest(".collapsed")) return;
+  if (!window.MotorsportFlow?.available) return withFlow(box, () => renderProcess(key));
   const rows = read(key); const statuses = next[key];
   const mine = can("advance", key, { createdBy: "__nobody__", subsystem: me().subsystem });
   const stages = statuses.map((s, i) => ({ id: s, label: s, items: rows.filter((r) => r.status === s).map(cfg.label), final: i === statuses.length - 1 }));
@@ -772,8 +792,8 @@ const renderProcesses = () => Object.keys(PROCESSES).forEach(renderProcess);
 let orgFocus = "";
 function renderOrg() {
   const box = $("#org-flow");
-  if (!$("#team").classList.contains("active")) return;
-  if (!window.MotorsportFlow?.available) { box.innerHTML = `<p class="empty">React Flow didn't load (needs an internet connection).</p>`; return; }
+  if (!onPage("#org-flow")) return;
+  if (!window.MotorsportFlow?.available) return withFlow(box, renderOrg);
   const team = read("team");
   const select = $("#org-focus");
   select.innerHTML = `<option value="">Highlight a member…</option>` + [...team].sort((a, b) => a.name.localeCompare(b.name)).map((m) => `<option value="${m.id}" ${m.id === orgFocus ? "selected" : ""}>${esc(m.name)}${(m.subteams || []).length > 1 ? ` (${m.subteams.length} subteams)` : ""}</option>`).join("");
@@ -783,7 +803,9 @@ $("#org-focus").addEventListener("change", (e) => { orgFocus = e.target.value; r
 
 function flash(text) { const el = $("#toast"); el.textContent = text; el.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.remove("show"), 3200); }
 
-const renderAll = () => { renderUser(); renderParentOptions(); renderTree(); renderVenn(); renderAssemblyMode(); renderParts(); renderPurchases(); renderJobs(); renderBudgets(); renderApprovals(); renderTeam(); renderOverview(); renderProjectForm(); renderProjects(); renderDocForm(); renderDocs(); renderDeliverables(); renderBomPreview(); renderProcesses(); renderOrg(); EXT.renders.forEach((f) => f()); };
+const PAGE_RENDERS = [["#parent-select", () => renderParentOptions()], ["#parts-tree", () => { renderTree(); renderVenn(); renderAssemblyMode(); }], ["#parts-body", () => renderParts()], ["#purchases-body", () => renderPurchases()], ["#jobs-body", () => renderJobs()], ["#budget-list", () => renderBudgets()], ["#approvals-body", () => renderApprovals()], ["#team-body", () => renderTeam()], ["#stats", () => renderOverview()], ["#projects-list", () => { renderProjectForm(); renderProjects(); }], ["#docs-body", () => { renderDocForm(); renderDocs(); renderDeliverables(); }], ["#bom-preview", () => renderBomPreview()], [".flow.short", () => renderProcesses()], ["#org-flow", () => renderOrg()]];
+// EXT.renders entries are either a function (always runs) or [selector, fn] (runs when that element is on this page).
+const renderAll = () => { renderUser(); PAGE_RENDERS.forEach(([sel, fn]) => { if (onPage(sel)) fn(); }); EXT.renders.forEach((r) => { if (typeof r === "function") r(); else if (onPage(r[0])) r[1](); }); };
 
 // ---------- Forms & actions ----------
 const labelOf = (key, row) => row.name || row.item || row.category || row.title || "item";
@@ -857,4 +879,4 @@ document.addEventListener("click", (event) => {
 
 ensureTeam();
 ensureDeliverables();
-renderAll();
+// The first render happens at the end of events.js, once every module has registered its hooks.

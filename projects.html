@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projects · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="projects">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab active" href="projects.html" aria-current="page"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="projects" class="view active">
+        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: project</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-projects" class="flow short"></div></div>
+        <div class="card"><p class="eyebrow">PROPOSAL</p><h2>Propose a project</h2>
+          <form id="project-form" class="form-grid">
+            <label>Project name<input name="name" required placeholder="e.g. Lightweight front upright" /></label>
+            <label>Subteam<select name="subteam" id="project-subteam" required></select></label>
+            <label>Estimated cost ($)<input name="estCost" type="number" min="0" step="0.01" /></label>
+            <label>Target date<input name="targetDate" type="date" /></label>
+            <label class="wide">Summary / justification<textarea name="summary" rows="2" placeholder="What it is, why it's worth doing, and what success looks like"></textarea></label>
+            <label class="wide">People to assign <small class="hint">Ctrl/⌘-click to pick several. The subteam lead picks the POC after approval.</small><select name="assignees" id="project-assignees" multiple size="5"></select></label>
+            <button>Submit proposal</button>
+          </form>
+        </div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">TRACKING</p><h2>Projects</h2></div><div class="filters"><label class="check"><input type="checkbox" id="project-mine" />Only mine</label><div class="seg" id="project-filter"><button class="active" data-filter="Active">Active</button><button data-filter="Proposed">Proposals</button><button data-filter="Complete">Complete</button><button data-filter="Rejected">Rejected</button><button data-filter="All">All</button></div></div></div>
+          <div id="project-counts" class="counts"></div>
+          <div id="projects-list" class="projects"></div><p id="projects-empty" class="empty">No projects match.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">SEASON</p><h2>Timeline</h2></div><span class="hint">Bars run from approval to target date. Milestone dates are placeholders; set your real event dates.</span></div>
+          <div id="timeline" class="timeline-wrap"></div>
+          <div class="milestones"><div id="milestones-list"></div><form id="milestone-form" class="inline-form"><input name="name" required placeholder="Milestone, e.g. Design freeze" /><input name="date" type="date" required /><button class="secondary">Add milestone</button></form></div></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

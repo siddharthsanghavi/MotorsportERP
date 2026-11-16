@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documents · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="documents">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab active" href="documents.html" aria-current="page"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="documents" class="view active">
+        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: document control</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-docs" class="flow short"></div></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">COMPETITION</p><h2>Deliverables</h2></div><div id="deliverables-progress" class="progress-row deliv-progress"></div></div>
+          <p class="hint">Link each deliverable to its document. It counts as ready once that document is released. Set the due dates from this season's rules and event calendar.</p>
+          <div class="table-wrap"><table class="compact deliv-table"><thead><tr><th>Deliverable</th><th>Document</th><th>Due</th><th>State</th></tr></thead><tbody id="deliverables-body"></tbody></table></div></div>
+        <div class="card"><p class="eyebrow">REGISTER</p><h2>Register a document</h2>
+          <form id="doc-form" class="form-grid">
+            <label>Title<input name="title" required placeholder="e.g. Rear rocker drawing" /></label>
+            <label>Type<select name="type" id="doc-type"></select></label>
+            <label>Revision<input name="revision" placeholder="A" /></label>
+            <label>Subteam<select name="subteam" id="doc-subteam"></select></label>
+            <label>Part<select name="partId" id="doc-part"></select></label>
+            <label>Project<select name="projectId" id="doc-project"></select></label>
+            <label class="wide">Link to file<input name="url" type="url" placeholder="https://drive.google.com/… or your PDM / OneDrive link" /></label>
+            <button>Register document</button>
+          </form>
+        </div>
+        <div class="card"><div class="list-header"><div><h2>Document register</h2></div><div class="filters"><span id="docs-count" class="pill"></span><select id="doc-filter-type"></select><input id="doc-search" type="search" placeholder="Search documents" /></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Number</th><th>Title</th><th>Type</th><th>Rev</th><th>Linked to</th><th>Owner</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody id="docs-body"></tbody></table></div><p id="docs-empty" class="empty">No documents match.</p></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

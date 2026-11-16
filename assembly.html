@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Assembly · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="assembly">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab active" href="assembly.html" aria-current="page"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="assembly" class="view active">
+        <div class="card"><div class="list-header"><div><p class="eyebrow">STRUCTURE</p><h2>Parts tree</h2></div><div class="seg" id="tree-filter"><button class="active" data-platform="All">All</button><button data-platform="EV">EV car</button><button data-platform="ICE">ICE car</button></div></div>
+          <p class="hint">Each part connects to the assembly it mounts on. Set a part's parent assembly on the Parts tab.</p>
+          <div class="seg" id="mode-toggle"><button class="active" data-mode="tree">List</button><button data-mode="graph">Graph</button></div>
+          <div id="parts-tree-wrap"><div id="parts-tree" class="tree"></div><p id="tree-empty" class="empty">No parts yet. Load demo data or add parts.</p></div>
+          <div id="parts-flow-wrap" class="hidden"><p id="flow-hint" class="hint"></p><div id="parts-flow" class="flow"></div></div></div>
+        <div class="card"><p class="eyebrow">PLATFORM COMMONALITY</p><h2>Shared parts: EV vs ICE</h2><div id="venn"></div></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

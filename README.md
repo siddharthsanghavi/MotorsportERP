@@ -5,6 +5,10 @@ ERP workspace for an FSAE Formula car team.
 
 Open `index.html` in a browser (or serve the folder with any static file server). The app uses browser `localStorage`, so it needs no backend setup.
 
+Each section is its own static page (`index.html` is the Overview, then `projects.html`, `events.html`, `parts.html`, `assembly.html`, `documents.html`, `approvals.html`, `machine-shop.html`, `stock.html`, `testing.html`, `purchasing.html`, `budget.html`, `team.html`). Every page loads the same scripts (`app.js`, `ops.js`, `events.js`, `ui.js`) but only draws its own section. React and React Flow are fetched only when a map is on screen (an opened "How it works" map, the assembly graph, or the team map). The header and sidebar are repeated in each page, so a nav change has to be made in every file.
+
+Pages share data through `localStorage`, which works across local files in Chrome and Edge. Firefox may keep a separate store for each local file, so use Chrome/Edge or serve the folder (for example `npx serve`) if data doesn't carry between pages.
+
 ### Modules
 
 - Projects: propose a project (subteam, cost, target date, people), get it approved by the subteam lead or leadership, then track it through Approved → In Progress → Review → Complete. Several people can be assigned; the subteam lead picks one as POC. Each project has assigned tasks with due dates and a progress bar, and open tasks show up in each person's queue.
@@ -32,4 +36,4 @@ Open `index.html` in a browser (or serve the folder with any static file server)
 - Events: track days the team hosts and competitions it attends. Each event has a lead, a roster with roles (volunteering for hosted days is open; travel spots for competitions need the lead to confirm, and capacity is enforced), a checklist whose due dates count back from the start date, a packing list linked to stock, an incident log, results and points for competitions, and the test sessions run there. You can request the entry fee as a purchase, events appear on the season timeline, and overdue checklist items and upcoming events show up in people's queues.
 - Overview dashboard with counts, a "waiting on you" queue, and an audit log of who did what
 
-The React Flow graph loads React and React Flow from unpkg, so it needs an internet connection; QR labels use qrcode-generator from cdnjs. Everything else works offline.
+The maps load React and React Flow from unpkg on demand, so they need an internet connection; QR labels use qrcode-generator from cdnjs. Everything else works offline.

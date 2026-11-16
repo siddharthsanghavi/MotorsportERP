@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="budget">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab active" href="budget.html" aria-current="page"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="budget" class="view active">
+        <div class="card" data-perm="create:budgets"><p class="eyebrow">FINANCE</p><h2>Budget allocation</h2><p class="no-perm hint hidden">🔒 Only a Budget Manager can set allocations.</p>
+          <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><label>Spent ($)<input name="spent" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
+        </div>
+        <div class="card"><h2>Budget overview</h2><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
+        <div class="card"><div class="list-header"><div><p class="eyebrow">FSAE COST EVENT</p><h2>Cost report</h2></div><div class="filters"><div class="seg" id="cost-car"><button data-car="EV">EV car</button><button data-car="ICE">ICE car</button></div><label class="inline">Shop rate $/h <input id="shop-rate" type="number" min="0" step="1" class="narrow" /></label><button class="secondary" id="cost-export">Export CSV</button></div></div>
+          <p class="hint">Rolled up from the BOM: material, process (incl. linked shop-job hours × shop rate), fasteners, tooling. A starting point. Check it against this season's cost rules and official tables before submitting.</p>
+          <div class="table-wrap"><table class="compact cost-table"><thead><tr><th>P/N</th><th>Part</th><th>Material</th><th>Process</th><th>Fasteners</th><th>Tooling</th><th>Total</th><th>Share</th></tr></thead><tbody id="cost-body"></tbody><tfoot><tr id="cost-total"></tr></tfoot></table></div>
+          <p id="cost-note" class="hint"></p></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

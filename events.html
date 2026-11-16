@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Events · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="events">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab active" href="events.html" aria-current="page"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="events" class="view active">
+        <div class="card"><div class="list-header"><div><h2>Events</h2><p class="hint">Track days we host and competitions we travel to: roster, checklist, packing, incidents and results.</p></div><div class="filters"><select id="event-kind"><option value="">All types</option><option value="Competition">Competitions</option><option value="Hosted">Hosted by us</option></select><div class="seg" id="event-filter"><button class="active" data-filter="Upcoming">Upcoming</button><button data-filter="Past">Past</button><button data-filter="All">All</button></div></div></div>
+          <div id="event-stats" class="mini-stats"></div>
+          <div id="events-list" class="events"></div><p id="events-empty" class="empty">No events here yet.</p></div>
+        <div class="card" id="event-form-card"><h2>New event</h2>
+          <form id="event-form" class="form-grid">
+            <label>Event name<input name="name" required placeholder="e.g. Winter test day" /></label>
+            <label>Type<select name="kind"><option value="Hosted">Hosted by us (track / test day)</option><option value="Competition">Competition we attend</option></select></label>
+            <label>Car<select name="car"><option>Both</option><option>EV</option><option>ICE</option></select></label>
+            <label>Start date<input name="startDate" type="date" required /></label>
+            <label>End date<input name="endDate" type="date" /></label>
+            <label>Location<input name="location" placeholder="Venue / lot" /></label>
+            <label>Registration deadline<input name="regDeadline" type="date" /></label>
+            <label>Entry / venue fee ($)<input name="fee" type="number" min="0" step="0.01" /></label>
+            <label>Spots / volunteer slots<input name="capacity" type="number" min="0" /></label>
+            <label>Event lead<select name="leadId" id="event-lead"></select></label>
+            <label class="wide">Notes<textarea name="notes" rows="2"></textarea></label>
+            <button>Create event</button>
+          </form>
+          <p class="hint">A standard checklist is added for the event type, with due dates counted back from the start date.</p></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

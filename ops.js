@@ -126,7 +126,8 @@ nouns.stock = "stock item"; nouns.sessions = "test session"; nouns.milestones = 
 // "Order" on a part: jump to Purchasing with the form pre-filled.
 function orderPart(partId) {
   const part = read("parts").find((p) => p.id === partId); if (!part) return;
-  showView("purchasing"); renderPurchaseLinks();
+  if (!onPage("#purchase-form")) { try { sessionStorage.setItem("merp-order-part", partId); } catch { /* storage blocked */ } location.href = PAGE_FILES.purchasing; return; }
+  renderPurchaseLinks();
   const f = $("#purchase-form");
   f.elements.namedItem("item").value = `${part.name}${part.partNumber ? ` (${part.partNumber})` : ""}`;
   f.elements.vendor.value = part.supplier || "";
@@ -152,7 +153,7 @@ function renderPurchaseLinks() {
   fill("#job-part", optHtml(opts.partIds())); fill("#job-project", optHtml(opts.projectIds())); fill("#job-owner", memberSelect("", "— Select machinist —"));
   fill("#job-machine", Object.keys(MACHINES).map((m) => `<option value="${esc(m)}">${esc(m || "— None —")}</option>`).join(""));
 }
-EXT.renders.push(renderPurchaseLinks);
+EXT.renders.push(["#purchase-form, #job-form", renderPurchaseLinks]);
 
 // Project spend from linked purchases.
 EXT.projectExtras.push((p) => {
@@ -241,7 +242,7 @@ $("#session-form").addEventListener("submit", (e) => {
   logEvent(`logged a ${v.car} ${v.type} session (${km} km${worn ? `, wear added to ${worn} parts` : ""}${issues.length ? `, ${issues.length} issues` : ""})`);
   e.target.reset(); renderAll();
 });
-EXT.renders.push(renderSessionForm, renderSessions);
+EXT.renders.push(["#session-form", renderSessionForm], ["#sessions-body", renderSessions]);
 
 // =====================================================================
 // Part life & inspections, failure log.
@@ -291,7 +292,7 @@ OPS.fail = (b) => {
     logEvent(`logged a ${v.severity.toLowerCase()} failure on ${p.name}`); renderAll();
   });
 };
-EXT.renders.push(renderLife);
+EXT.renders.push(["#life-body", renderLife]);
 EXT.inbox.push((u) => tracked().filter((p) => lifeState(p).cls === "bad" && (leads(p.subsystem, u) && (u.leads || []).length || isLeader(u))).map((p) => `Part: ${p.name} — ${lifeState(p).text} (${Math.round(p.kmUsed || 0)} km)`));
 
 // =====================================================================
@@ -326,7 +327,7 @@ EXT.before.push((action, key, row) => {
   }
   return "";
 });
-EXT.renders.push(renderTraining);
+EXT.renders.push(["#training-body", renderTraining]);
 
 // =====================================================================
 // Stock & tools: check-out / check-in, consumable use, reorder requests, QR labels.
@@ -399,7 +400,7 @@ $("#stock-form").addEventListener("submit", (e) => {
 $("#stock-search").addEventListener("input", (e) => { stockQuery = e.target.value.trim().toLowerCase(); renderStock(); });
 $("#stock-kind").addEventListener("change", (e) => { stockKind = e.target.value; renderStock(); });
 function renderStockForm() { const el = $("#stock-training"); const cur = el.value; el.innerHTML = opts.trainings().map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(""); el.value = cur; }
-EXT.renders.push(renderStockForm, renderStock);
+EXT.renders.push(["#stock-training", renderStockForm], ["#stock-body", renderStock]);
 EXT.inbox.push((u) => [
   ...read("stock").flatMap((i) => (i.checkouts || []).filter((c) => c.memberId === u.id && c.dueBack && c.dueBack < todayISO()).map(() => `Return ${i.name} to ${i.location || "the shop"} (overdue)`)),
   ...(isTrainer(u) ? read("stock").filter((i) => i.kind !== "Tool" && i.kind !== "Safety gear" && Number(i.minQty) && Number(i.qty) <= Number(i.minQty) && !i.reorderPurchaseId).map((i) => `Stock: ${i.name} is low (${i.qty} left)`) : [])
@@ -426,7 +427,7 @@ $("#scan-input").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return; const code = e.target.value.trim(); e.target.value = "";
   const m = code.match(/^MERP:(stock|part):(.+)$/); if (!m) return flash("Not a MotorsportERP label.");
   if (m[1] === "stock") { const row = $(`#stock-${CSS.escape(m[2])}`); if (!row) return flash("That item isn't in stock any more."); stockKind = ""; stockQuery = ""; row.scrollIntoView({ block: "center" }); row.classList.add("flash-row"); setTimeout(() => row.classList.remove("flash-row"), 2000); }
-  else { const p = read("parts").find((x) => x.id === m[2]); if (!p) return flash("That part isn't in the BOM any more."); showView("parts"); $("#part-search").value = p.partNumber || p.name; renderParts(); }
+  else { const p = read("parts").find((x) => x.id === m[2]); if (!p) return flash("That part isn't in the BOM any more."); if (!onPage("#parts-body")) { location.href = `${PAGE_FILES.parts}?find=${encodeURIComponent(p.partNumber || p.name)}`; return; } $("#part-search").value = p.partNumber || p.name; renderParts(); }
 });
 
 // =====================================================================
@@ -452,7 +453,7 @@ function renderTimeline() {
   $("#milestone-form").classList.toggle("hidden", !can("create", "milestones"));
 }
 $("#milestone-form").addEventListener("submit", (e) => { e.preventDefault(); const v = formValues(e.target); write("milestones", [...read("milestones"), { id: id(), name: v.name, date: v.date, createdBy: me().id }]); logEvent(`added milestone ${v.name} (${v.date})`); e.target.reset(); renderAll(); });
-EXT.renders.push(renderTimeline);
+EXT.renders.push(["#timeline", renderTimeline]);
 
 // =====================================================================
 // Cost report: rolls the BOM up by subsystem (materials, processes incl. shop hours, fasteners, tooling).
@@ -486,7 +487,7 @@ $("#cost-export").addEventListener("click", () => {
   const rows = costLines().map((l) => [l.p.subsystem, l.p.parent || "", l.p.partNumber || "", l.p.name, l.q, l.material.toFixed(2), l.process.toFixed(2), l.fasteners.toFixed(2), l.tooling.toFixed(2), l.total.toFixed(2)]);
   downloadFile(`cost-report-${costCar}-${todayISO()}.csv`, [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n")); logEvent(`exported the ${costCar} cost report`);
 });
-EXT.renders.push(renderCostReport);
+EXT.renders.push(["#cost-body", renderCostReport]);
 
 // =====================================================================
 // Demo data for the modules above.
@@ -556,4 +557,7 @@ EXT.seeds.push((team) => {
 });
 
 ensureTrainings();
-renderAll();
+// Arrivals from another page: a pending "Order" or a scanned part.
+try { const pending = sessionStorage.getItem("merp-order-part"); if (pending && onPage("#purchase-form")) { sessionStorage.removeItem("merp-order-part"); orderPart(pending); } } catch { /* storage blocked */ }
+const findParam = new URLSearchParams(location.search).get("find");
+if (findParam && onPage("#part-search")) { $("#part-search").value = findParam; renderParts(); }

@@ -117,6 +117,7 @@ function eventCard(e) {
 }
 
 function renderEvents() {
+  if (!onPage("#events-list")) return;
   const today = todayISO(); const all = read("events");
   let list = all.filter((e) => !evKind || e.kind === evKind);
   if (evFilter === "Upcoming") list = list.filter((e) => evOpenState(e) && evEnd(e) >= today);
@@ -127,14 +128,17 @@ function renderEvents() {
   const nextComp = upcoming.filter((e) => e.kind === "Competition").sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
   const nextHost = upcoming.filter((e) => e.kind === "Hosted").sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
   $("#event-stats").innerHTML = [["Upcoming", upcoming.length], ["Next competition", nextComp ? `${nextComp.name} · ${daysBetween(today, nextComp.startDate)} d` : "—"], ["Next hosted day", nextHost ? `${nextHost.name} · ${daysBetween(today, nextHost.startDate)} d` : "—"], ["Completed this season", all.filter((e) => e.status === "Completed").length]].map(([l, v]) => `<div class="mini-stat"><span>${l}</span><strong>${esc(v)}</strong></div>`).join("");
+  if (!onPage("#events-list")) return;
   $("#events-list").innerHTML = list.map(eventCard).join("");
   $("#events-empty").style.display = list.length ? "none" : "block";
   $("#event-form-card").classList.toggle("hidden", !can("create", "events"));
   const lead = $("#event-lead"); const cur = lead.value; lead.innerHTML = memberSelect(cur || me().id, "— Lead —"); lead.value = cur || me().id;
-  // Testing tab: pick the event a session was run at.
-  const se = $("#session-event"); if (se) { const c = se.value; se.innerHTML = `<option value="">— None —</option>` + all.filter((e) => e.status !== "Cancelled").sort((a, b) => b.startDate.localeCompare(a.startDate)).map((e) => `<option value="${e.id}">${esc(e.name)} (${esc(e.startDate)})</option>`).join(""); se.value = c; }
 }
-EXT.renders.push(renderEvents);
+// Testing page: pick the event a session was run at.
+function renderSessionEvents() {
+  const all = read("events"); const se = $("#session-event"); { const c = se.value; se.innerHTML = `<option value="">— None —</option>` + all.filter((e) => e.status !== "Cancelled").sort((a, b) => b.startDate.localeCompare(a.startDate)).map((e) => `<option value="${e.id}">${esc(e.name)} (${esc(e.startDate)})</option>`).join(""); se.value = c; }
+}
+EXT.renders.push(["#events-list", renderEvents], ["#session-event", renderSessionEvents]);
 
 // ----- Interactions -----
 document.querySelectorAll("#event-filter button").forEach((b) => b.addEventListener("click", () => { evFilter = b.dataset.filter; renderEvents(); }));
@@ -287,3 +291,6 @@ EXT.seeds.push((team) => {
   // Link the past shakedown sessions to the shakedown day.
   write("sessions", read("sessions").map((s) => (s.type === "Shakedown" ? { ...s, eventId: shake.id } : s)));
 });
+
+// Every module is loaded: draw the page once.
+renderAll();
