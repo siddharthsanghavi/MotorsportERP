@@ -292,5 +292,7 @@ EXT.seeds.push((team) => {
   write("sessions", read("sessions").map((s) => (s.type === "Shakedown" ? { ...s, eventId: shake.id } : s)));
 });
 
-// Every module is loaded: draw the page once.
+// Every module is loaded: draw the page once, then pick up anything handed over from another page.
 renderAll();
+handleArrivals();
+if (typeof applyPendingVendor === "function") applyPendingVendor();

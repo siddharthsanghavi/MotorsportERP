@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vendors · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="vendors">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="events.html"><span>Events</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab active" href="vendors.html" aria-current="page"><span>Vendors</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+      </nav>
+
+      <section id="vendors" class="view active">
+        <div class="card"><div class="list-header"><div><h2>Vendors</h2><p class="hint">Suppliers the team buys from. Purchase requests and stock items pick their vendor from this list.</p></div><div class="filters"><span id="vendor-count" class="pill"></span><select id="vendor-category" aria-label="Filter by category"></select><input id="vendor-search" type="search" placeholder="Search vendors" /></div></div>
+          <div id="vendor-stats" class="mini-stats"></div>
+          <div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Category</th><th>Contact</th><th>Lead time</th><th>Spent</th><th>Purchases</th><th></th></tr></thead><tbody id="vendors-body"></tbody></table></div><p id="vendors-empty" class="empty">No vendors match.</p></div>
+        <div class="card"><h2>Add a vendor</h2>
+          <form id="vendor-form" class="form-grid">
+            <label>Vendor name<input name="name" required /></label>
+            <label>Category<select name="category"><option>Raw material</option><option>Fasteners</option><option>Hardware & tools</option><option>Electronics</option><option>Composites</option><option>Machining & fabrication</option><option>Tyres & wheels</option><option>Consumables</option><option>Safety equipment</option><option>Events & fees</option><option>Other</option></select></label>
+            <label>Contact name<input name="contactName" /></label>
+            <label>Email<input name="email" type="email" /></label>
+            <label>Phone<input name="phone" type="tel" /></label>
+            <label>Website<input name="website" placeholder="example.com" /></label>
+            <label>Typical lead time (days)<input name="leadTimeDays" type="number" min="0" /></label>
+            <label>Terms / account notes<input name="terms" placeholder="Team account, net 30…" /></label>
+            <label class="check"><input type="checkbox" name="preferred" />Preferred vendor</label>
+            <label class="wide">Notes<textarea name="notes" rows="2"></textarea></label>
+            <button>Add vendor</button>
+          </form></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="vendors.js"></script>
+    <script src="events.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

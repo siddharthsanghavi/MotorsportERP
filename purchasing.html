@@ -32,6 +32,7 @@
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
         <a class="tab active" href="purchasing.html" aria-current="page"><span>Purchasing</span></a>
+        <a class="tab" href="vendors.html"><span>Vendors</span></a>
         <a class="tab" href="budget.html"><span>Budget</span></a>
         <p class="nav-group">People</p>
         <a class="tab" href="team.html"><span>Team</span></a>
@@ -40,16 +41,17 @@
       <section id="purchasing" class="view active">
         <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: purchasing</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-purchases" class="flow short"></div></div>
         
-        <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>Vendor & purchase request</h2>
-          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<input name="vendor" required /></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Budget<select name="category" id="purchase-category"></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
+        <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>New purchase request</h2>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<select name="vendor" id="purchase-vendor" data-vendor-select required></select></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Budget<select name="category" id="purchase-category"></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
         </div>
-        <div class="card"><div class="list-header"><h2>Purchase requests</h2><span id="vendor-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
+        <div class="card"><div class="list-header"><h2>Purchase requests</h2><a class="pill" href="vendors.html" id="vendor-count">Vendors</a></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
     <dialog id="editor" class="editor"></dialog>
     <script src="app.js"></script>
     <script src="ops.js"></script>
+    <script src="vendors.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

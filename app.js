@@ -2,7 +2,7 @@ const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchas
 const $ = (selector) => document.querySelector(selector) || document.createElement("div");
 const onPage = (selector) => !!document.querySelector(selector);
 // One HTML file per section. Overview is index.html.
-const PAGE_FILES = { overview: "index.html", projects: "projects.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", budget: "budget.html", team: "team.html" };
+const PAGE_FILES = { overview: "index.html", projects: "projects.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", vendors: "vendors.html", budget: "budget.html", team: "team.html" };
 // Hooks that ops.js (loaded after this file) plugs into.
 const EXT = { renders: [], seeds: [], can: [], before: [], after: [], inbox: [], projectExtras: [], rowButtons: [] };
 // Stages an item can't advance past (no wrapping back to the start).

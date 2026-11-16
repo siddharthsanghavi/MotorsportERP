@@ -93,11 +93,11 @@ const opts = {
   trainings: () => [["", "None"], ...read("trainings").map((t) => [t.id, t.name])]
 };
 const EDIT_FIELDS = {
-  parts: () => [["partNumber", "Part number", "text"], ["name", "Name", "text"], ["subsystem", "Subsystem", "select", [...SUBSYSTEMS, "Other"]], ["platform", "Used on", "select", ["Both", "EV", "ICE"]], ["parent", "Parent assembly", "select", [["", "— Top level —"], ...opts.parts().map((n) => [n, n])]], ["quantity", "Quantity", "number"], ["location", "Location", "text"], ["material", "Material", "text"], ["supplier", "Supplier", "text"], ["unitCost", "Material cost each ($)", "number"], ["processCost", "Process cost each ($)", "number"], ["fastenerCost", "Fasteners each ($)", "number"], ["toolingCost", "Tooling (one-off, $)", "number"], ["safetyCritical", "Safety-critical part", "checkbox"], ["lifeLimitKm", "Life limit (km)", "number"], ["inspectEveryKm", "Inspect every (km)", "number"], ["kmUsed", "Km used so far", "number"]],
-  purchases: () => [["item", "Item", "text"], ["vendor", "Vendor", "text"], ["amount", "Amount ($)", "number"], ["neededBy", "Needed by", "date"], ["category", "Budget", "select", opts.budgets()], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
+  parts: (row) => [["partNumber", "Part number", "text"], ["name", "Name", "text"], ["subsystem", "Subsystem", "select", [...SUBSYSTEMS, "Other"]], ["platform", "Used on", "select", ["Both", "EV", "ICE"]], ["parent", "Parent assembly", "select", [["", "— Top level —"], ...opts.parts().map((n) => [n, n])]], ["quantity", "Quantity", "number"], ["location", "Location", "text"], ["material", "Material", "text"], ["supplier", "Supplier", "select", vendorOptions(row?.supplier)], ["unitCost", "Material cost each ($)", "number"], ["processCost", "Process cost each ($)", "number"], ["fastenerCost", "Fasteners each ($)", "number"], ["toolingCost", "Tooling (one-off, $)", "number"], ["safetyCritical", "Safety-critical part", "checkbox"], ["lifeLimitKm", "Life limit (km)", "number"], ["inspectEveryKm", "Inspect every (km)", "number"], ["kmUsed", "Km used so far", "number"]],
+  purchases: (row) => [["item", "Item", "text"], ["vendor", "Vendor", "select", vendorOptions(row?.vendor)], ["amount", "Amount ($)", "number"], ["neededBy", "Needed by", "date"], ["category", "Budget", "select", opts.budgets()], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
   jobs: () => [["name", "Job / part", "text"], ["ownerId", "Machinist", "member"], ["machine", "Machine", "select", Object.keys(MACHINES)], ["material", "Material", "text"], ["dueDate", "Due", "date"], ["priority", "Priority", "select", ["Normal", "High", "Critical"]], ["hours", "Machine hours", "number"], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
   projects: () => [["name", "Project name", "text"], ["estCost", "Estimated cost ($)", "number"], ["targetDate", "Target date", "date"], ["summary", "Summary", "textarea"]],
-  stock: () => [["name", "Name", "text"], ["kind", "Kind", "select", ["Tool", "Consumable", "Spare part", "Safety gear"]], ["qty", "Quantity", "number"], ["minQty", "Reorder at (min)", "number"], ["location", "Location / bin", "text"], ["unitCost", "Unit cost ($)", "number"], ["vendor", "Usual vendor", "text"], ["training", "Training needed", "select", opts.trainings()]]
+  stock: (row) => [["name", "Name", "text"], ["kind", "Kind", "select", ["Tool", "Consumable", "Spare part", "Safety gear"]], ["qty", "Quantity", "number"], ["minQty", "Reorder at (min)", "number"], ["location", "Location / bin", "text"], ["unitCost", "Unit cost ($)", "number"], ["vendor", "Usual vendor", "select", vendorOptions(row?.vendor)], ["training", "Training needed", "select", opts.trainings()]]
 };
 function canEdit(key, row) {
   const u = me(); if (!u.id || !row) return false;
@@ -110,7 +110,7 @@ function canEdit(key, row) {
 }
 function editRecord(key, recId) {
   const rows = read(key); const row = rows.find((r) => r.id === recId); if (!row || !canEdit(key, row)) return flash("You can't edit this.");
-  openForm(`Edit ${nouns[key] || "item"}`, EDIT_FIELDS[key](), row, (vals) => {
+  openForm(`Edit ${nouns[key] || "item"}`, EDIT_FIELDS[key](row), row, (vals) => {
     const changed = Object.keys(vals).filter((k) => String(vals[k] ?? "") !== String(row[k] ?? ""));
     if (key === "parts" && vals.parent && createsCycle(rows, row.id, vals.parent)) return flash("That parent would create a loop in the parts tree.");
     Object.assign(row, vals, { updatedAt: new Date().toISOString() }); write(key, rows);
@@ -557,7 +557,9 @@ EXT.seeds.push((team) => {
 });
 
 ensureTrainings();
-// Arrivals from another page: a pending "Order" or a scanned part.
+// Arrivals from another page: a pending "Order" or a scanned part. Called from events.js after the first render.
+function handleArrivals() {
 try { const pending = sessionStorage.getItem("merp-order-part"); if (pending && onPage("#purchase-form")) { sessionStorage.removeItem("merp-order-part"); orderPart(pending); } } catch { /* storage blocked */ }
 const findParam = new URLSearchParams(location.search).get("find");
 if (findParam && onPage("#part-search")) { $("#part-search").value = findParam; renderParts(); }
+}

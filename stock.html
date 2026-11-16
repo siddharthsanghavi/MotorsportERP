@@ -32,6 +32,7 @@
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
         <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="vendors.html"><span>Vendors</span></a>
         <a class="tab" href="budget.html"><span>Budget</span></a>
         <p class="nav-group">People</p>
         <a class="tab" href="team.html"><span>Team</span></a>
@@ -43,7 +44,7 @@
           <div class="table-wrap"><table><thead><tr><th></th><th>Item</th><th>Kind</th><th>Location</th><th>Available</th><th>Checked out to</th><th></th></tr></thead><tbody id="stock-body"></tbody></table></div><p id="stock-empty" class="empty">No stock items.</p>
           <p class="hint">Tools need the shop safety orientation (and any listed training) to check out. Tick rows to print labels for just those.</p></div>
         <div class="card" id="stock-form-card"><p class="eyebrow">ADD</p><h2>Add a stock item or tool</h2>
-          <form id="stock-form" class="form-grid"><label>Name<input name="name" required /></label><label>Kind<select name="kind"><option>Tool</option><option>Consumable</option><option>Spare part</option><option>Safety gear</option></select></label><label>Quantity<input name="qty" type="number" min="0" value="1" required /></label><label>Reorder at (min)<input name="minQty" type="number" min="0" /></label><label>Location / bin<input name="location" /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Usual vendor<input name="vendor" /></label><label>Training needed<select name="training" id="stock-training"></select></label><button>Add item</button></form></div>
+          <form id="stock-form" class="form-grid"><label>Name<input name="name" required /></label><label>Kind<select name="kind"><option>Tool</option><option>Consumable</option><option>Spare part</option><option>Safety gear</option></select></label><label>Quantity<input name="qty" type="number" min="0" value="1" required /></label><label>Reorder at (min)<input name="minQty" type="number" min="0" /></label><label>Location / bin<input name="location" /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Usual vendor<select name="vendor" id="stock-vendor" data-vendor-select></select></label><label>Training needed<select name="training" id="stock-training"></select></label><button>Add item</button></form></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -51,6 +52,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <script src="app.js"></script>
     <script src="ops.js"></script>
+    <script src="vendors.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>
