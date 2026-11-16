@@ -133,7 +133,7 @@ function orderPart(partId) {
   if (part.unitCost) f.elements.amount.value = (Number(part.unitCost) * Number(part.quantity || 1)).toFixed(2);
   f.elements.partId.value = part.id;
   const budget = read("budgets").find((b) => b.category.toLowerCase().startsWith(String(part.subsystem).toLowerCase().slice(0, 5))); if (budget) f.elements.category.value = budget.category;
-  f.elements.namedItem("item").focus(); flash("Purchase request pre-filled from the part. Check it and save.");
+  f.closest(".card")?.classList.remove("collapsed"); f.elements.namedItem("item").focus(); flash("Purchase request pre-filled from the part. Check it and save.");
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-op]"); if (!b) return;
@@ -230,7 +230,7 @@ $("#session-form").addEventListener("submit", (e) => {
   e.preventDefault(); const v = formValues(e.target);
   if (v.dataUrl && !safeUrl(v.dataUrl)) return flash("Data links must start with https://, http:// or file:");
   const km = Number(v.km) || 0; const issues = String(v.issues || "").split("\n").map((x) => x.trim()).filter(Boolean);
-  const s = { id: id(), date: v.date, car: v.car, type: v.type, location: v.location, driverId: v.driverId, laps: v.laps, km: String(km), notes: v.notes, dataUrl: v.dataUrl, issues, taskProjectId: issues.length ? v.taskProjectId : "", createdBy: me().id, createdAt: new Date().toISOString() };
+  const s = { id: id(), date: v.date, car: v.car, type: v.type, location: v.location, driverId: v.driverId, laps: v.laps, km: String(km), notes: v.notes, dataUrl: v.dataUrl, issues, taskProjectId: issues.length ? v.taskProjectId : "", eventId: v.eventId || "", createdBy: me().id, createdAt: new Date().toISOString() };
   write("sessions", [...read("sessions"), s]);
   const worn = km ? applyWear(v.car, km) : 0;
   if (issues.length && v.taskProjectId) {
@@ -434,7 +434,7 @@ $("#scan-input").addEventListener("keydown", (e) => {
 // =====================================================================
 function renderTimeline() {
   const projects = read("projects").filter((p) => p.status !== "Rejected");
-  const milestones = [...read("milestones")].sort((a, b) => a.date.localeCompare(b.date));
+  const milestones = [...read("milestones"), ...(KEYS.events ? read("events") : []).filter((e) => e.status !== "Cancelled" && e.startDate >= daysFromNow(-60)).map((e) => ({ id: e.id, name: e.name, date: e.startDate, event: e.kind }))].sort((a, b) => a.date.localeCompare(b.date));
   const start = (p) => (p.approvedAt || p.createdAt || new Date().toISOString()).slice(0, 10);
   const end = (p) => p.targetDate || daysFromNow(30);
   const dates = [...projects.flatMap((p) => [start(p), end(p)]), ...milestones.map((m) => m.date), todayISO()].sort();
@@ -446,9 +446,9 @@ function renderTimeline() {
   $("#timeline").innerHTML = `<div class="tl">
     <div class="tl-row tl-head"><div class="tl-label"></div><div class="tl-track">${months.map((m) => `<span class="tl-month" style="left:${pos(m)}%">${m.toLocaleString(undefined, { month: "short" })}${m.getMonth() === 0 ? ` ’${String(m.getFullYear()).slice(2)}` : ""}</span>`).join("")}</div></div>
     ${projects.map((p) => { const late = p.targetDate && p.targetDate < today && p.status !== "Complete"; const l = pos(start(p)); const w = Math.max(1.2, pos(end(p)) - l); return `<div class="tl-row"><div class="tl-label" title="${esc(p.name)}">${esc(p.name)}<small>${esc(p.subteam)}</small></div><div class="tl-track"><div class="tl-bar ${stageClass(p.status)}${late ? " late" : ""}" style="left:${l}%;width:${w}%" title="${esc(p.name)}: ${start(p)} → ${end(p)} (${p.status})">${late ? "late" : ""}</div></div></div>`; }).join("")}
-    <div class="tl-overlay">${milestones.map((m, i) => `<div class="tl-ms${i % 2 ? " alt" : ""}" style="left:${pos(m.date)}%"><span>${esc(m.name)}<small>${esc(m.date)}</small></span></div>`).join("")}<div class="tl-today" style="left:${pos(today)}%"><span>Today</span></div></div>
+    <div class="tl-overlay">${milestones.map((m, i) => `<div class="tl-ms${i % 2 ? " alt" : ""}${m.event ? " ev" : ""}" style="left:${pos(m.date)}%"><span>${esc(m.name)}<small>${esc(m.date)}</small></span></div>`).join("")}<div class="tl-today" style="left:${pos(today)}%"><span>Today</span></div></div>
   </div>`;
-  $("#milestones-list").innerHTML = milestones.map((m) => `<span class="person-chip">${esc(m.name)} · ${esc(m.date)}${can("delete", "milestones", m) ? `<button class="x" data-action="delete" data-key="milestones" data-id="${m.id}" title="Remove">×</button>` : ""}</span>`).join(" ");
+  $("#milestones-list").innerHTML = milestones.map((m) => `<span class="person-chip">${esc(m.name)} · ${esc(m.date)}${!m.event && can("delete", "milestones", m) ? `<button class="x" data-action="delete" data-key="milestones" data-id="${m.id}" title="Remove">×</button>` : ""}</span>`).join(" ");
   $("#milestone-form").classList.toggle("hidden", !can("create", "milestones"));
 }
 $("#milestone-form").addEventListener("submit", (e) => { e.preventDefault(); const v = formValues(e.target); write("milestones", [...read("milestones"), { id: id(), name: v.name, date: v.date, createdBy: me().id }]); logEvent(`added milestone ${v.name} (${v.date})`); e.target.reset(); renderAll(); });
@@ -545,7 +545,7 @@ EXT.seeds.push((team) => {
     { id: sid(), name: "Nitrile gloves (box)", kind: "Consumable", qty: "9", minQty: "4", location: "Entry shelf", unitCost: "12", vendor: "", training: "", checkouts: [] }
   ].map((x) => ({ ...x, createdBy: shopLead, createdAt: new Date().toISOString() })));
   // Milestones (placeholders: set the real dates for your events).
-  write("milestones", [["Design freeze", 25], ["Car shakedown", 85], ["Design report due", 120], ["Competition (EV)", 175], ["Competition (ICE)", 182]].map(([name, d]) => ({ id: id(), name, date: daysFromNow(d), createdBy: team[0].id })));
+  write("milestones", [["Design freeze", 25], ["Car shakedown", 85], ["Design report due", 120]].map(([name, d]) => ({ id: id(), name, date: daysFromNow(d), createdBy: team[0].id })));
   // Backdate approved projects so the timeline shows real bars.
   write("projects", read("projects").map((p, i) => (p.status === "Proposed" || p.status === "Rejected" ? p : { ...p, approvedAt: new Date(Date.now() - (25 + i * 9) * 864e5).toISOString() })));
   setSettings({ shopRate: 35 });
