@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="design.html"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -42,9 +42,9 @@
         <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: purchasing</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-purchases" class="flow short"></div></div>
         
         <div class="card"><p class="eyebrow">PROCUREMENT</p><h2>New purchase request</h2>
-          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<select name="vendor" id="purchase-vendor" data-vendor-select required></select></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Budget<select name="category" id="purchase-category"></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
+          <form id="purchase-form" class="form-grid"><label>Item / service<input name="item" required /></label><label>Vendor<select name="vendor" id="purchase-vendor" data-vendor-select required></select></label><label>Amount ($)<input name="amount" type="number" min="0" step="0.01" required /></label><label>Needed by<input name="neededBy" type="date" required /></label><label>Submitted<input name="submittedAt" type="date" required /></label><label>Budget<select name="category" id="purchase-category" required></select></label><label>Fund (account)<select name="fundId" id="purchase-fund" required></select></label><label>For part<select name="partId" id="purchase-part"></select></label><label>For project<select name="projectId" id="purchase-project"></select></label><button>Save request</button></form>
         </div>
-        <div class="card"><div class="list-header"><h2>Purchase requests</h2><a class="pill" href="vendors.html" id="vendor-count">Vendors</a></div><div class="table-wrap"><table><thead><tr><th>Item</th><th>Vendor</th><th>Amount</th><th>Needed by</th><th>Requested by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
+        <div class="card"><div class="list-header"><h2>Purchase requests</h2><a class="pill" href="vendors.html" id="vendor-count">Vendors</a></div><div class="table-wrap"><table><thead><tr><th>Submitted</th><th>Item</th><th>Amount</th><th>Budget · fund</th><th>Needed by</th><th>Status</th><th></th></tr></thead><tbody id="purchases-body"></tbody></table></div><p id="purchases-empty" class="empty">No purchase requests yet.</p></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -52,6 +52,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="design.html"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab active" href="testing.html" aria-current="page"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -42,14 +42,14 @@
         <div class="card"><p class="eyebrow">TRACK</p><h2>Log a test session</h2>
           <form id="session-form" class="form-grid">
             <label>Date<input name="date" type="date" required /></label>
-            <label>Car<select name="car"><option>EV</option><option>ICE</option></select></label>
+            <label>Car<select name="car"><option value="EV">KS10E (EV)</option><option value="ICE">KS10 (ICE)</option></select></label>
             <label>Event<select name="type" id="session-type"></select></label>
             <label>Location<input name="location" placeholder="Campus lot, kart track…" /></label>
             <label>Driver<select name="driverId" id="session-driver"></select></label>
             <label>Laps<input name="laps" type="number" min="0" /></label>
             <label>Distance (km)<input name="km" type="number" min="0" step="0.1" required /></label>
             <label>Data log link<input name="dataUrl" type="url" placeholder="https://… (MoTeC / AiM export)" /></label>
-            <label class="wide">Setup & notes<textarea name="notes" rows="2" placeholder="Tyre pressures, ride height, damper clicks, what changed"></textarea></label>
+            <label class="wide">Quick notes<textarea name="notes" rows="2" placeholder="The full plan, checks and setup sheet go in the car log, which opens after you log the session"></textarea></label>
             <label class="wide">Issues found <small class="hint">One per line. Each becomes a task in the project you pick.</small><textarea name="issues" rows="2"></textarea></label>
             <label>Add issues as tasks in<select name="taskProjectId" id="session-project"></select></label><label>At event<select name="eventId" id="session-event"></select></label>
             <button>Log session</button>
@@ -58,6 +58,7 @@
         </div>
         <div class="card"><div class="list-header"><h2>Sessions</h2></div><div id="session-stats" class="mini-stats"></div>
           <div class="table-wrap"><table><thead><tr><th>Date</th><th>Car</th><th>Event</th><th>Driver</th><th>Laps</th><th>Distance</th><th>Notes & issues</th><th></th></tr></thead><tbody id="sessions-body"></tbody></table></div><p id="sessions-empty" class="empty">No sessions logged yet.</p></div>
+        <div id="car-log" class="card car-log hidden"></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -65,6 +66,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

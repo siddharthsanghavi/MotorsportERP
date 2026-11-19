@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="design.html"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -40,13 +40,11 @@
 
       <section id="budget" class="view active">
         <div class="card" data-perm="create:budgets"><p class="eyebrow">FINANCE</p><h2>Budget allocation</h2><p class="no-perm hint hidden">🔒 Only a Budget Manager can set allocations.</p>
-          <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><label>Spent ($)<input name="spent" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
+          <form id="budget-form" class="form-grid"><label>Budget category<input name="category" placeholder="Powertrain, Aero..." required /></label><label>Budget ($)<input name="budget" type="number" min="0" step="0.01" required /></label><button>Add allocation</button></form>
         </div>
-        <div class="card"><h2>Budget overview</h2><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
-        <div class="card"><div class="list-header"><div><p class="eyebrow">FSAE COST EVENT</p><h2>Cost report</h2></div><div class="filters"><div class="seg" id="cost-car"><button data-car="EV">EV car</button><button data-car="ICE">ICE car</button></div><label class="inline">Shop rate $/h <input id="shop-rate" type="number" min="0" step="1" class="narrow" /></label><button class="secondary" id="cost-export">Export CSV</button></div></div>
-          <p class="hint">Rolled up from the BOM: material, process (incl. linked shop-job hours × shop rate), fasteners, tooling. A starting point. Check it against this season's cost rules and official tables before submitting.</p>
-          <div class="table-wrap"><table class="compact cost-table"><thead><tr><th>P/N</th><th>Part</th><th>Material</th><th>Process</th><th>Fasteners</th><th>Tooling</th><th>Total</th><th>Share</th></tr></thead><tbody id="cost-body"></tbody><tfoot><tr id="cost-total"></tr></tfoot></table></div>
-          <p id="cost-note" class="hint"></p></div>
+        <div class="card"><div class="list-header"><div><h2>Funding accounts</h2><p class="hint">Where the money comes from. Spent = purchases ordered or received from that account; committed = funds an Admin approved that aren't ordered yet.</p></div><button class="secondary" id="fund-add" data-op="add-fund">Add account</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Account</th><th>Available</th><th>Spent</th><th>Committed</th><th>Remaining</th><th></th></tr></thead><tbody id="funds-body"></tbody><tfoot><tr id="funds-total"></tr></tfoot></table></div></div>
+        <div class="card"><h2>Budget overview</h2><p class="hint">Spend comes only from purchase requests charged to each budget.</p><div id="budget-list" class="budget-list"></div><p id="budget-empty" class="empty">No budget allocations yet.</p></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -54,6 +52,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="design.html"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab active" href="parts.html" aria-current="page"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -39,20 +39,14 @@
       </nav>
 
       <section id="parts" class="view active">
-        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: part</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-parts" class="flow short"></div></div>
-        
-        <div class="card"><p class="eyebrow">INVENTORY</p><h2>Track a part</h2>
-          <form id="part-form" class="form-grid">
-            <label>Part number<input name="partNumber" placeholder="SUS-1010" /></label><label>Part name<input name="name" required /></label><label>Subsystem<select name="subsystem" required><option value="">Select</option><option>Powertrain</option><option>Suspension</option><option>Brakes</option><option>Electronics</option><option>Chassis</option><option>Aero</option><option>Other</option></select></label>
-            <label>Quantity<input name="quantity" type="number" min="1" value="1" required /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Location<input name="location" placeholder="Car / Shop / Storage" required /></label><label>Status<select name="status"><option>In Design</option><option>Manufacturing</option><option>In Inventory</option><option>Installed</option><option>Damaged</option></select></label><label>Parent assembly<select name="parent" id="parent-select"><option value="">— Top level —</option></select></label><label>Used on<select name="platform"><option>Both</option><option>EV</option><option>ICE</option></select></label><button>Add part</button>
-          </form>
-        </div>
+        <div class="card"><div class="list-header"><div><h2>Parts by car</h2><nav id="pb-crumbs" class="crumbs" aria-label="Breadcrumb"></nav></div><button class="secondary hidden" id="pb-export"></button></div>
+          <div id="parts-browser"></div></div>
         <div class="card"><div class="list-header"><div><p class="eyebrow">BOM</p><h2>Import a bill of materials</h2></div><div class="row-actions"><button class="secondary" id="bom-template">Download template</button><button class="secondary" id="bom-export">Export current BOM</button></div></div>
-          <p class="hint">CSV from SolidWorks, Onshape, Fusion, or a spreadsheet. Columns are matched by name (Part Number, Description, Qty, Parent or Level, Subsystem, Used On, Unit Cost…) and you can fix the mapping before importing. An indented BOM with a Level column builds the parts tree for you.</p>
+          <p class="hint">CSV from SolidWorks, Onshape, Fusion, or a spreadsheet. Columns are matched by name (Part Number, Description, Qty, Car, System, Assembly, Unit Cost…). Use the FSAE system names or codes (BR, DT, FR, EL, MS, ST, SU, WT); blank part numbers are generated and you can fix the mapping before importing.</p>
           <div class="bom-inputs"><label class="file-drop">Choose CSV file<input type="file" id="bom-file" accept=".csv,.tsv,.txt,text/csv" /></label><div class="bom-paste"><textarea id="bom-paste" rows="3" placeholder="…or paste rows copied from a spreadsheet (with the header row)"></textarea><button class="secondary" id="bom-paste-go">Preview pasted BOM</button></div></div>
           <div id="bom-preview"></div>
         </div>
-        <div class="card"><div class="list-header"><h2>Parts & inventory</h2><div class="filters"><button class="secondary" id="part-labels">Print QR labels</button><input id="part-search" type="search" placeholder="Search parts" /></div></div><div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Subsystem</th><th>Used on</th><th>Qty</th><th>Unit cost</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="parts-body"></tbody></table></div><p id="parts-empty" class="empty">No parts tracked yet.</p></div>
+        <div class="card"><div class="list-header"><h2>Search all parts</h2><div class="filters"><button class="secondary" id="part-labels">Print QR labels</button><input id="part-search" type="search" placeholder="Search parts" /></div></div><div class="table-wrap hidden" id="parts-search-table"><table><thead><tr><th>P/N</th><th>Part</th><th>Car</th><th>System</th><th>Assembly</th><th>Qty</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="parts-body"></tbody></table></div><p id="parts-empty" class="empty">No parts tracked yet.</p></div>
         <div class="card"><div class="list-header"><div><p class="eyebrow">SAFETY</p><h2>Part life & inspections</h2></div><span class="hint">Km are added from logged test sessions. Set limits with Edit on a part.</span></div>
           <div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Km used</th><th>Next inspection</th><th>State</th><th></th></tr></thead><tbody id="life-body"></tbody></table></div><p id="life-empty" class="empty">No parts have life limits or inspection intervals yet.</p></div>
         <div class="card"><p class="eyebrow">RELIABILITY</p><h2>Failure log</h2><div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Part</th><th>Severity</th><th>What happened</th><th>Logged by</th></tr></thead><tbody id="failures-body"></tbody></table></div><p id="failures-empty" class="empty">No failures logged.</p></div>
@@ -64,6 +58,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

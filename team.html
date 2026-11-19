@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab" href="projects.html"><span>Projects</span></a>
+        <a class="tab" href="design.html"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -45,7 +45,7 @@
         <div class="card" data-perm="manage:team"><p class="eyebrow">ROSTER</p><h2>Add a team member</h2><p class="no-perm hint hidden">🔒 Only an Admin can change the roster and roles.</p>
           <form id="member-form" class="form-grid"><label>Name<input name="name" required /></label><label>Title<select name="title" id="member-title"></select></label><label>Leads subteam<select name="lead" id="member-lead"></select></label><fieldset class="roles-pick wide"><legend>Subteams</legend><div id="member-subteams" class="checks"></div></fieldset><fieldset class="roles-pick"><legend>Permissions</legend><div id="member-roles"></div></fieldset><button>Add member</button></form>
         </div>
-        <div class="card"><div class="list-header"><h2>Roster</h2><span id="team-count" class="pill"></span></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Title</th><th>Subteams</th><th>Permissions</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
+        <div class="card"><div class="list-header"><h2>Roster</h2><span id="team-count" class="pill"></span></div><div id="team-projects" class="people team-projects hidden"></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Title</th><th>Subteams</th><th>Permissions</th><th></th></tr></thead><tbody id="team-body"></tbody></table></div></div>
         <div class="card"><div class="list-header"><div><p class="eyebrow">SHOP SAFETY</p><h2>Training sign-offs</h2></div><select id="training-subteam" aria-label="Filter by subteam"></select></div>
           <p id="training-note" class="hint"></p>
           <div class="table-wrap"><table class="compact training"><thead id="training-head"></thead><tbody id="training-body"></tbody></table></div></div>
@@ -57,6 +57,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

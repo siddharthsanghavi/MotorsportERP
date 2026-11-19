@@ -95,7 +95,7 @@ const opts = {
 const EDIT_FIELDS = {
   parts: (row) => [["partNumber", "Part number", "text"], ["name", "Name", "text"], ["subsystem", "Subsystem", "select", [...SUBSYSTEMS, "Other"]], ["platform", "Used on", "select", ["Both", "EV", "ICE"]], ["parent", "Parent assembly", "select", [["", "— Top level —"], ...opts.parts().map((n) => [n, n])]], ["quantity", "Quantity", "number"], ["location", "Location", "text"], ["material", "Material", "text"], ["supplier", "Supplier", "select", vendorOptions(row?.supplier)], ["unitCost", "Material cost each ($)", "number"], ["processCost", "Process cost each ($)", "number"], ["fastenerCost", "Fasteners each ($)", "number"], ["toolingCost", "Tooling (one-off, $)", "number"], ["safetyCritical", "Safety-critical part", "checkbox"], ["lifeLimitKm", "Life limit (km)", "number"], ["inspectEveryKm", "Inspect every (km)", "number"], ["kmUsed", "Km used so far", "number"]],
   purchases: (row) => [["item", "Item", "text"], ["vendor", "Vendor", "select", vendorOptions(row?.vendor)], ["amount", "Amount ($)", "number"], ["neededBy", "Needed by", "date"], ["category", "Budget", "select", opts.budgets()], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
-  jobs: () => [["name", "Job / part", "text"], ["ownerId", "Machinist", "member"], ["machine", "Machine", "select", Object.keys(MACHINES)], ["material", "Material", "text"], ["dueDate", "Due", "date"], ["priority", "Priority", "select", ["Normal", "High", "Critical"]], ["hours", "Machine hours", "number"], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
+  jobs: () => [["name", "Part / job", "text"], ["qty", "Quantity", "number"], ["cadUrl", "Drawing / CAD link", "url"], ["notes", "Notes", "textarea"], ["ownerId", "Machinist", "member"], ["machine", "Machine", "select", Object.keys(MACHINES)], ["material", "Material", "text"], ["dueDate", "Due", "date"], ["priority", "Priority", "select", ["Normal", "High", "Critical"]], ["hours", "Machine hours", "number"], ["partId", "For part", "select", opts.partIds()], ["projectId", "For project", "select", opts.projectIds()]],
   projects: () => [["name", "Project name", "text"], ["estCost", "Estimated cost ($)", "number"], ["targetDate", "Target date", "date"], ["summary", "Summary", "textarea"]],
   stock: (row) => [["name", "Name", "text"], ["kind", "Kind", "select", ["Tool", "Consumable", "Spare part", "Safety gear"]], ["qty", "Quantity", "number"], ["minQty", "Reorder at (min)", "number"], ["location", "Location / bin", "text"], ["unitCost", "Unit cost ($)", "number"], ["vendor", "Usual vendor", "select", vendorOptions(row?.vendor)], ["training", "Training needed", "select", opts.trainings()]]
 };
@@ -110,10 +110,11 @@ function canEdit(key, row) {
 }
 function editRecord(key, recId) {
   const rows = read(key); const row = rows.find((r) => r.id === recId); if (!row || !canEdit(key, row)) return flash("You can't edit this.");
-  openForm(`Edit ${nouns[key] || "item"}`, EDIT_FIELDS[key](row), row, (vals) => {
+  openForm(`Edit ${nouns[key] || "item"}`, EDIT_FIELDS[key](row), key === "parts" ? partFormValues(row) : row, (vals) => {
+    if (key === "parts") prepPartEdit(row, vals);
     const changed = Object.keys(vals).filter((k) => String(vals[k] ?? "") !== String(row[k] ?? ""));
     if (key === "parts" && vals.parent && createsCycle(rows, row.id, vals.parent)) return flash("That parent would create a loop in the parts tree.");
-    Object.assign(row, vals, { updatedAt: new Date().toISOString() }); write(key, rows);
+    Object.assign(row, vals, { updatedAt: new Date().toISOString() }); if (key === "parts") syncPart(row); write(key, rows); if (key === "parts") ensureAssemblies();
     if (changed.length) logEvent(`edited ${nouns[key] || key} "${labelOf(key, row)}" (${changed.join(", ")})`);
     renderAll();
   });
@@ -144,6 +145,7 @@ document.addEventListener("click", (e) => {
   else if (OPS[op]) OPS[op](b);
 });
 const OPS = {};
+OPS["team-all"] = () => { history.replaceState(null, "", location.pathname); teamSubteam = ""; trainingSubteam = ""; renderAll(); };
 
 // Purchase & job forms: link selects and member owner.
 function renderPurchaseLinks() {
@@ -220,10 +222,10 @@ function renderSessions() {
   const kmBy = (car) => sessions.filter((s) => s.car === car).reduce((t, s) => t + Number(s.km || 0), 0);
   const drivers = {}; sessions.forEach((s) => { if (s.driverId) drivers[s.driverId] = (drivers[s.driverId] || 0) + Number(s.km || 0); });
   const topDrivers = Object.entries(drivers).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d, km]) => `${memberName(d)} ${Math.round(km)} km`).join(" · ");
-  $("#session-stats").innerHTML = [["EV car", `${Math.round(kmBy("EV"))} km`], ["ICE car", `${Math.round(kmBy("ICE"))} km`], ["Sessions", sessions.length], ["Top drivers", topDrivers || "—"]].map(([l, v]) => `<div class="mini-stat"><span>${l}</span><strong>${esc(v)}</strong></div>`).join("");
+  $("#session-stats").innerHTML = [[carName("EV"), `${Math.round(kmBy("EV"))} km`], [carName("ICE"), `${Math.round(kmBy("ICE"))} km`], ["Sessions", sessions.length], ["Top drivers", topDrivers || "—"]].map(([l, v]) => `<div class="mini-stat"><span>${l}</span><strong>${esc(v)}</strong></div>`).join("");
   $("#sessions-body").innerHTML = sessions.map((s) => {
     const url = safeUrl(s.dataUrl);
-    return `<tr><td class="mono">${esc(s.date)}</td><td><span class="plat ${s.car.toLowerCase()}">${esc(s.car)}</span></td><td>${esc(s.type)}<div class="hint">${esc(s.location || "")}</div></td><td>${esc(memberName(s.driverId))}</td><td class="mono">${esc(s.laps || "—")}</td><td class="mono">${esc(s.km)} km</td><td>${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ""}${(s.issues || []).length ? `<div class="hint">${s.issues.length} issue${s.issues.length > 1 ? "s" : ""}${s.taskProjectId ? ` → tasks in ${esc(read("projects").find((p) => p.id === s.taskProjectId)?.name || "?")}` : ""}: ${esc(s.issues.join("; "))}</div>` : ""}</td><td>${url ? `<a class="link-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Data</a>` : ""}${can("delete", "sessions", s) ? `<button class="link danger" data-action="delete" data-key="sessions" data-id="${s.id}">Delete</button>` : ""}</td></tr>`;
+    return `<tr><td class="mono">${esc(s.date)}</td><td><span class="plat ${s.car.toLowerCase()}">${esc(carName(s.car))}</span></td><td>${esc(s.type)}<div class="hint">${esc(s.location || "")}</div></td><td>${esc(memberName(s.driverId))}</td><td class="mono">${esc(s.laps || "—")}</td><td class="mono">${esc(s.km)} km</td><td>${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ""}${(s.issues || []).length ? `<div class="hint">${s.issues.length} issue${s.issues.length > 1 ? "s" : ""}${s.taskProjectId ? ` → tasks in ${esc(read("projects").find((p) => p.id === s.taskProjectId)?.name || "?")}` : ""}: ${esc(s.issues.join("; "))}</div>` : ""}</td><td><button class="link" data-op="car-log" data-id="${s.id}">${s.log ? "Car log" : "Start car log"}</button>${url ? `<a class="link-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Data</a>` : ""}${can("delete", "sessions", s) ? `<button class="link danger" data-action="delete" data-key="sessions" data-id="${s.id}">Delete</button>` : ""}</td></tr>`;
   }).join("");
   $("#sessions-empty").style.display = sessions.length ? "none" : "block";
 }
@@ -262,7 +264,7 @@ function renderLife() {
   $("#life-body").innerHTML = rows.map((p) => {
     const st = lifeState(p); const used = Number(p.kmUsed || 0); const limit = Number(p.lifeLimitKm || 0);
     const canAct = leads(p.subsystem) || isTrainer();
-    return `<tr><td class="mono">${esc(p.partNumber || "—")}</td><td>${esc(p.name)}${p.safetyCritical ? ` <span class="sc-chip" title="Safety-critical">SC</span>` : ""}<div class="hint">${esc(p.subsystem)} · <span class="plat ${platformOf(p).toLowerCase()}">${platformOf(p)}</span></div></td><td>${limit ? `<div class="progress-row"><div class="progress ${st.cls}"><i style="width:${Math.min(100, used / limit * 100)}%"></i></div><span>${Math.round(used)}/${limit} km</span></div>` : `<span class="mono">${Math.round(used)} km</span>`}</td><td class="mono">${st.nextAt !== null ? `${st.nextAt} km` : "—"}${p.lastInspectedAt ? `<div class="hint">last ${esc(p.lastInspectedAt.slice(0, 10))}</div>` : ""}</td><td><span class="life ${st.cls}">${st.text}</span></td><td>${canAct ? `<button class="link" data-op="inspect" data-id="${p.id}">Log inspection</button><button class="link" data-op="replace" data-id="${p.id}">Replaced</button>` : ""}<button class="link danger" data-op="fail" data-id="${p.id}">Log failure</button></td></tr>`;
+    return `<tr><td class="mono">${esc(p.partNumber || "—")}</td><td>${esc(p.name)}${p.safetyCritical ? ` <span class="sc-chip" title="Safety-critical">SC</span>` : ""}<div class="hint">${esc((p.vehicles || []).join(" · "))} · ${esc(p.system || p.subsystem)} › ${esc(p.assembly || "")}</div></td><td>${limit ? `<div class="progress-row"><div class="progress ${st.cls}"><i style="width:${Math.min(100, used / limit * 100)}%"></i></div><span>${Math.round(used)}/${limit} km</span></div>` : `<span class="mono">${Math.round(used)} km</span>`}</td><td class="mono">${st.nextAt !== null ? `${st.nextAt} km` : "—"}${p.lastInspectedAt ? `<div class="hint">last ${esc(p.lastInspectedAt.slice(0, 10))}</div>` : ""}</td><td><span class="life ${st.cls}">${st.text}</span></td><td>${canAct ? `<button class="link" data-op="inspect" data-id="${p.id}">Log inspection</button><button class="link" data-op="replace" data-id="${p.id}">Replaced</button>` : ""}<button class="link danger" data-op="fail" data-id="${p.id}">Log failure</button></td></tr>`;
   }).join("");
   $("#life-empty").style.display = rows.length ? "none" : "block";
   const fails = [...read("failures")].reverse();
@@ -301,7 +303,7 @@ EXT.inbox.push((u) => tracked().filter((p) => lifeState(p).cls === "bad" && (lea
 const DEFAULT_TRAININGS = [["safety", "Shop safety orientation"], ["manual-mill", "Manual mill"], ["manual-lathe", "Manual lathe"], ["cnc-mill", "CNC mill"], ["waterjet", "Waterjet"], ["tig", "TIG welding"], ["composites", "Composites layup"], ["hv", "HV safety (EV)"], ["torque", "Torque & safety-wire"]];
 function ensureTrainings() { if (!read("trainings").length) write("trainings", DEFAULT_TRAININGS.map(([tid, name]) => ({ id: tid, name }))); }
 const trained = (memberId, trainingId) => !trainingId || read("signoffs").some((s) => s.memberId === memberId && s.trainingId === trainingId);
-let trainingSubteam = "";
+let trainingSubteam = SUBTEAMS[new URLSearchParams(location.search).get("subteam")] ? new URLSearchParams(location.search).get("subteam") : "";
 function renderTraining() {
   const trainings = read("trainings"); const signoffs = read("signoffs"); const canSign = isTrainer();
   const sel = $("#training-subteam"); sel.innerHTML = `<option value="">Everyone</option>` + Object.keys(SUBTEAMS).map((t) => `<option ${t === trainingSubteam ? "selected" : ""}>${esc(t)}</option>`).join("");
@@ -422,72 +424,13 @@ $("#stock-labels").addEventListener("click", () => {
   const list = read("stock").filter((i) => !picked.length || picked.includes(i.id));
   printLabels(list.map((i) => ({ code: `MERP:stock:${i.id}`, title: i.name, sub: `${i.kind}${i.location ? " · " + i.location : ""}` })));
 });
-$("#part-labels").addEventListener("click", () => printLabels(read("parts").filter((p) => p.partNumber).map((p) => ({ code: `MERP:part:${p.id}`, title: p.name, sub: `${p.partNumber} · ${p.subsystem}` }))));
+$("#part-labels").addEventListener("click", () => printLabels(read("parts").filter((p) => p.partNumber).map((p) => ({ code: `MERP:part:${p.id}`, title: p.name, sub: `${p.partNumber} · ${p.assembly || p.subsystem}` }))));
 $("#scan-input").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return; const code = e.target.value.trim(); e.target.value = "";
   const m = code.match(/^MERP:(stock|part):(.+)$/); if (!m) return flash("Not a MotorsportERP label.");
   if (m[1] === "stock") { const row = $(`#stock-${CSS.escape(m[2])}`); if (!row) return flash("That item isn't in stock any more."); stockKind = ""; stockQuery = ""; row.scrollIntoView({ block: "center" }); row.classList.add("flash-row"); setTimeout(() => row.classList.remove("flash-row"), 2000); }
   else { const p = read("parts").find((x) => x.id === m[2]); if (!p) return flash("That part isn't in the BOM any more."); if (!onPage("#parts-body")) { location.href = `${PAGE_FILES.parts}?find=${encodeURIComponent(p.partNumber || p.name)}`; return; } $("#part-search").value = p.partNumber || p.name; renderParts(); }
 });
-
-// =====================================================================
-// Season timeline: projects as bars against milestones.
-// =====================================================================
-function renderTimeline() {
-  const projects = read("projects").filter((p) => p.status !== "Rejected");
-  const milestones = [...read("milestones"), ...(KEYS.events ? read("events") : []).filter((e) => e.status !== "Cancelled" && e.startDate >= daysFromNow(-60)).map((e) => ({ id: e.id, name: e.name, date: e.startDate, event: e.kind }))].sort((a, b) => a.date.localeCompare(b.date));
-  const start = (p) => (p.approvedAt || p.createdAt || new Date().toISOString()).slice(0, 10);
-  const end = (p) => p.targetDate || daysFromNow(30);
-  const dates = [...projects.flatMap((p) => [start(p), end(p)]), ...milestones.map((m) => m.date), todayISO()].sort();
-  if (!dates.length) { $("#timeline").innerHTML = ""; return; }
-  const [y0, m0] = dates[0].split("-").map(Number); const min = new Date(y0, m0 - 1, 1); const [y1, m1] = dates[dates.length - 1].split("-").map(Number); const maxD = new Date(y1, m1 - 1, 1); const max = new Date(maxD.getFullYear(), maxD.getMonth() + 1, 1);
-  const span = max - min; const pos = (d) => Math.max(0, Math.min(100, (new Date(d) - min) / span * 100));
-  const months = []; for (let d = new Date(min); d < max; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.push(d);
-  const today = todayISO();
-  $("#timeline").innerHTML = `<div class="tl">
-    <div class="tl-row tl-head"><div class="tl-label"></div><div class="tl-track">${months.map((m) => `<span class="tl-month" style="left:${pos(m)}%">${m.toLocaleString(undefined, { month: "short" })}${m.getMonth() === 0 ? ` ’${String(m.getFullYear()).slice(2)}` : ""}</span>`).join("")}</div></div>
-    ${projects.map((p) => { const late = p.targetDate && p.targetDate < today && p.status !== "Complete"; const l = pos(start(p)); const w = Math.max(1.2, pos(end(p)) - l); return `<div class="tl-row"><div class="tl-label" title="${esc(p.name)}">${esc(p.name)}<small>${esc(p.subteam)}</small></div><div class="tl-track"><div class="tl-bar ${stageClass(p.status)}${late ? " late" : ""}" style="left:${l}%;width:${w}%" title="${esc(p.name)}: ${start(p)} → ${end(p)} (${p.status})">${late ? "late" : ""}</div></div></div>`; }).join("")}
-    <div class="tl-overlay">${milestones.map((m, i) => `<div class="tl-ms${i % 2 ? " alt" : ""}${m.event ? " ev" : ""}" style="left:${pos(m.date)}%"><span>${esc(m.name)}<small>${esc(m.date)}</small></span></div>`).join("")}<div class="tl-today" style="left:${pos(today)}%"><span>Today</span></div></div>
-  </div>`;
-  $("#milestones-list").innerHTML = milestones.map((m) => `<span class="person-chip">${esc(m.name)} · ${esc(m.date)}${!m.event && can("delete", "milestones", m) ? `<button class="x" data-action="delete" data-key="milestones" data-id="${m.id}" title="Remove">×</button>` : ""}</span>`).join(" ");
-  $("#milestone-form").classList.toggle("hidden", !can("create", "milestones"));
-}
-$("#milestone-form").addEventListener("submit", (e) => { e.preventDefault(); const v = formValues(e.target); write("milestones", [...read("milestones"), { id: id(), name: v.name, date: v.date, createdBy: me().id }]); logEvent(`added milestone ${v.name} (${v.date})`); e.target.reset(); renderAll(); });
-EXT.renders.push(["#timeline", renderTimeline]);
-
-// =====================================================================
-// Cost report: rolls the BOM up by subsystem (materials, processes incl. shop hours, fasteners, tooling).
-// =====================================================================
-let costCar = "EV";
-function costLines() {
-  const rate = Number(getSettings().shopRate || 35); const jobs = read("jobs");
-  return read("parts").filter((p) => [costCar, "Both"].includes(platformOf(p))).map((p) => {
-    const q = Number(p.quantity || 1); const hours = jobs.filter((j) => j.partId === p.id).reduce((s, j) => s + Number(j.hours || 0), 0);
-    const material = Number(p.unitCost || 0) * q; const process = Number(p.processCost || 0) * q + hours * rate; const fasteners = Number(p.fastenerCost || 0) * q; const tooling = Number(p.toolingCost || 0);
-    return { p, q, material, process, fasteners, tooling, hours, total: material + process + fasteners + tooling };
-  });
-}
-function renderCostReport() {
-  $("#shop-rate").value = getSettings().shopRate || 35;
-  document.querySelectorAll("#cost-car button").forEach((b) => b.classList.toggle("active", b.dataset.car === costCar));
-  const lines = costLines(); const bySub = {};
-  lines.forEach((l) => (bySub[l.p.subsystem] ||= []).push(l));
-  const sum = (arr, k) => arr.reduce((s, l) => s + l[k], 0);
-  const grand = lines.length ? sum(lines, "total") : 0;
-  $("#cost-body").innerHTML = Object.entries(bySub).sort().map(([sub, ls]) => `<tr class="cost-sub"><td colspan="2"><strong>${esc(sub)}</strong> <span class="hint">${ls.length} parts</span></td><td>${money(sum(ls, "material"))}</td><td>${money(sum(ls, "process"))}</td><td>${money(sum(ls, "fasteners"))}</td><td>${money(sum(ls, "tooling"))}</td><td><strong>${money(sum(ls, "total"))}</strong></td><td class="mono">${grand ? Math.round(sum(ls, "total") / grand * 100) : 0}%</td></tr>` +
-    ls.filter((l) => l.total).sort((a, b) => b.total - a.total).slice(0, 6).map((l) => `<tr class="cost-line"><td class="mono">${esc(l.p.partNumber || "—")}</td><td>${esc(l.p.name)} <span class="hint">×${l.q}${l.hours ? ` · ${l.hours} shop h` : ""}</span></td><td>${money(l.material)}</td><td>${money(l.process)}</td><td>${money(l.fasteners)}</td><td>${money(l.tooling)}</td><td>${money(l.total)}</td><td></td></tr>`).join("")).join("");
-  $("#cost-total").innerHTML = `<td colspan="2"><strong>${costCar} car total</strong></td><td>${money(sum(lines, "material"))}</td><td>${money(sum(lines, "process"))}</td><td>${money(sum(lines, "fasteners"))}</td><td>${money(sum(lines, "tooling"))}</td><td><strong>${money(grand)}</strong></td><td></td>`;
-  const missing = lines.filter((l) => !l.total && !lines.some((x) => x.p.parent === l.p.name)).length;
-  $("#cost-note").textContent = missing ? `${missing} leaf parts have no cost yet. Add costs with Edit on the Parts tab.` : "Every leaf part has a cost.";
-}
-document.querySelectorAll("#cost-car button").forEach((b) => b.addEventListener("click", () => { costCar = b.dataset.car; renderCostReport(); }));
-$("#shop-rate").addEventListener("change", (e) => { if (!isLeader(me()) && !has("Budget Manager")) { flash("Only leadership or a Budget Manager can change the shop rate."); renderCostReport(); return; } setSettings({ shopRate: Number(e.target.value) || 0 }); logEvent(`set the shop rate to $${e.target.value}/h`); renderAll(); });
-$("#cost-export").addEventListener("click", () => {
-  const head = ["System", "Assembly", "Part number", "Part", "Qty", "Material", "Process", "Fasteners", "Tooling", "Total"];
-  const rows = costLines().map((l) => [l.p.subsystem, l.p.parent || "", l.p.partNumber || "", l.p.name, l.q, l.material.toFixed(2), l.process.toFixed(2), l.fasteners.toFixed(2), l.tooling.toFixed(2), l.total.toFixed(2)]);
-  downloadFile(`cost-report-${costCar}-${todayISO()}.csv`, [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n")); logEvent(`exported the ${costCar} cost report`);
-});
-EXT.renders.push(["#cost-body", renderCostReport]);
 
 // =====================================================================
 // Demo data for the modules above.
@@ -545,11 +488,8 @@ EXT.seeds.push((team) => {
     { id: sid(), name: "CAN node board (spare)", kind: "Spare part", qty: "2", minQty: "2", location: "Electronics lab", unitCost: "35", vendor: "", training: "", checkouts: [] },
     { id: sid(), name: "Nitrile gloves (box)", kind: "Consumable", qty: "9", minQty: "4", location: "Entry shelf", unitCost: "12", vendor: "", training: "", checkouts: [] }
   ].map((x) => ({ ...x, createdBy: shopLead, createdAt: new Date().toISOString() })));
-  // Milestones (placeholders: set the real dates for your events).
-  write("milestones", [["Design freeze", 25], ["Car shakedown", 85], ["Design report due", 120]].map(([name, d]) => ({ id: id(), name, date: daysFromNow(d), createdBy: team[0].id })));
   // Backdate approved projects so the timeline shows real bars.
   write("projects", read("projects").map((p, i) => (p.status === "Proposed" || p.status === "Rejected" ? p : { ...p, approvedAt: new Date(Date.now() - (25 + i * 9) * 864e5).toISOString() })));
-  setSettings({ shopRate: 35 });
   write("notifications", [
     { id: id(), userId: team[0].id, text: "Project \"Carbon steering wheel\" needs approval", at: new Date(Date.now() - 36e5).toISOString(), read: false, by: "System" },
     { id: id(), userId: team[0].id, text: "Restock needed: M6×20 12.9 bolts", at: new Date(Date.now() - 72e5).toISOString(), read: true, by: "System" }

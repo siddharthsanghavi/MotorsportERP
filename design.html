@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Projects · MotorsportERP</title>
+    <title>Design · MotorsportERP</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
     <link rel="stylesheet" href="styles.css" />
@@ -19,7 +19,7 @@
       <nav class="tabs" aria-label="Main navigation">
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
-        <a class="tab active" href="projects.html" aria-current="page"><span>Projects</span></a>
+        <a class="tab active" href="design.html" aria-current="page"><span>Design</span></a>
         <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
@@ -27,7 +27,7 @@
         <a class="tab" href="documents.html"><span>Documents</span></a>
         <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
-        <a class="tab" href="machine-shop.html"><span>Machine shop</span></a>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
         <a class="tab" href="testing.html"><span>Testing</span></a>
         <p class="nav-group">Money</p>
@@ -39,8 +39,8 @@
       </nav>
 
       <section id="projects" class="view active">
-        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: project</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-projects" class="flow short"></div></div>
-        <div class="card"><p class="eyebrow">PROPOSAL</p><h2>Propose a project</h2>
+        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: design gates</h2></div><span class="hint">Each PP gate passes a subteam review, then a chief review. Either review can reject; the chief can send it back to the subteam review.</span></div><div id="process-projects" class="flow short"></div></div>
+        <div class="card"><p class="eyebrow">PROPOSAL</p><h2>Propose a design project</h2>
           <form id="project-form" class="form-grid">
             <label>Project name<input name="name" required placeholder="e.g. Lightweight front upright" /></label>
             <label>Subteam<select name="subteam" id="project-subteam" required></select></label>
@@ -51,12 +51,11 @@
             <button>Submit proposal</button>
           </form>
         </div>
-        <div class="card"><div class="list-header"><div><p class="eyebrow">TRACKING</p><h2>Projects</h2></div><div class="filters"><label class="check"><input type="checkbox" id="project-mine" />Only mine</label><div class="seg" id="project-filter"><button class="active" data-filter="Active">Active</button><button data-filter="Proposed">Proposals</button><button data-filter="Complete">Complete</button><button data-filter="Rejected">Rejected</button><button data-filter="All">All</button></div></div></div>
+        <div class="card"><div class="list-header"><div><h2>Design projects</h2></div><div class="filters"><label class="check"><input type="checkbox" id="project-mine" />Only mine</label><div class="seg" id="project-filter"><button class="active" data-filter="Active">Active</button><button data-filter="Proposed">Proposed</button><button data-filter="In review">In review</button><button data-filter="Manufacturing">Manufacturing</button><button data-filter="Rejected">Rejected</button><button data-filter="All">All</button></div></div></div>
           <div id="project-counts" class="counts"></div>
           <div id="projects-list" class="projects"></div><p id="projects-empty" class="empty">No projects match.</p></div>
-        <div class="card"><div class="list-header"><div><p class="eyebrow">SEASON</p><h2>Timeline</h2></div><span class="hint">Bars run from approval to target date. Milestone dates are placeholders; set your real event dates.</span></div>
-          <div id="timeline" class="timeline-wrap"></div>
-          <div class="milestones"><div id="milestones-list"></div><form id="milestone-form" class="inline-form"><input name="name" required placeholder="Milestone, e.g. Design freeze" /><input name="date" type="date" required /><button class="secondary">Add milestone</button></form></div></div>
+        <div class="card"><div class="list-header"><div><h2>Design timeline</h2><p class="hint">Only what has happened so far: each bar is split into the stages the project has been through, up to today.</p></div></div>
+          <div id="design-gantt" class="gantt-wrap"></div></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -64,6 +63,11 @@
     <script src="app.js"></script>
     <script src="ops.js"></script>
     <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="design.js"></script>
     <script src="events.js"></script>
     <script src="ui.js"></script>
   </body>

@@ -37,14 +37,14 @@
     const visible = parts.filter((p) => platform === "All" || [platform, "Both"].includes(p.platform || "Both"));
     const firstIdByName = {};
     visible.forEach((p) => { if (!(p.name in firstIdByName)) firstIdByName[p.name] = p.id; });
-    const parentIdOf = (p) => { const id = p.parent && firstIdByName[p.parent]; return id && id !== p.id ? id : null; };
+    const parentIdOf = (p) => { if ("parentId" in p) return p.parentId || null; const id = p.parent && firstIdByName[p.parent]; return id && id !== p.id ? id : null; };
     const pos = layout(visible, parentIdOf);
     const nodes = visible.map((p) => {
       const plat = p.platform || "Both"; const [bg, border] = COLORS[plat] || COLORS.Both;
       return {
         id: p.id, position: pos[p.id] || { x: 0, y: 0 },
         sourcePosition: Position.Right, targetPosition: Position.Left,
-        data: { label: h("div", { className: "flow-node" }, h("strong", null, p.name), h("small", null, `${plat} · ×${p.quantity} · ${p.status}`)) },
+        data: { label: h("div", { className: "flow-node" }, h("strong", null, p.label || p.name), h("small", null, p.sub || `${plat} · ×${p.quantity} · ${p.status}`)) },
         style: { background: bg, border: `1.5px solid ${border}`, borderRadius: 10, padding: 6, width: 190, fontSize: 12 }
       };
     });

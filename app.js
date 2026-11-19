@@ -2,7 +2,7 @@ const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchas
 const $ = (selector) => document.querySelector(selector) || document.createElement("div");
 const onPage = (selector) => !!document.querySelector(selector);
 // One HTML file per section. Overview is index.html.
-const PAGE_FILES = { overview: "index.html", projects: "projects.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", vendors: "vendors.html", budget: "budget.html", team: "team.html" };
+const PAGE_FILES = { overview: "index.html", projects: "design.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", vendors: "vendors.html", budget: "budget.html", team: "team.html" };
 // Hooks that ops.js (loaded after this file) plugs into.
 const EXT = { renders: [], seeds: [], can: [], before: [], after: [], inbox: [], projectExtras: [], rowButtons: [] };
 // Stages an item can't advance past (no wrapping back to the start).
@@ -73,17 +73,12 @@ function can(action, key, row) {
     case "delete:approvals": return leads(row?.subsystem) || (own(row) && row.status === "Pending Review");
     // Projects: anyone proposes; leadership or the subteam's lead approves (not their own); owner/lead/leadership run it.
     case "create:projects": return true;
-    case "advance:projects": {
-      if (!row) return isLeader(u) || (u.leads || []).length > 0;
-      if (row.status === "Complete") return false;
-      if (row.status === "Rejected") return own(row) || isLeader(u);
-      if (row.status === "Proposed") return (isLeader(u) || ledSub(row.subteam, u)) && (isAdmin || !own(row));
-      return row.pocId === u.id || ledSub(row.subteam, u) || isLeader(u);
-    }
+    // Design projects move through PP1–PP3 gates (subteam review, then chief review); see design.js.
+    case "advance:projects": return typeof designCan === "function" ? designCan(row, u) : false;
     // The POC is picked by the subteam lead (or leadership); the POC can also adjust who is assigned.
     case "assignPoc:projects": return !!row && row.status !== "Rejected" && (ledSub(row.subteam, u) || isLeader(u));
     case "assign:projects": return !!row && row.status !== "Rejected" && (row.pocId === u.id || ledSub(row.subteam, u) || isLeader(u));
-    case "reject:projects": return row?.status === "Proposed" && can("advance", "projects", row);
+    case "reject:projects": return typeof designActions === "function" && designActions(row, u).some(([a]) => a === "reject");
     case "delete:projects": return isLeader(u) || ledSub(row?.subteam, u) || (row && own(row) && ["Proposed", "Rejected"].includes(row.status));
     // Tasks: the project's people add them; assignee or project owner/lead moves them.
     case "create:tasks": return !!row && (onProject(row, u) || ledSub(row.subteam, u) || isLeader(u));
@@ -366,8 +361,11 @@ function renderUser() {
 function renderParts() {
   const query = ($("#part-search")?.value || "").trim().toLowerCase();
   const rows = read("parts").filter((part) => Object.values(part).join(" ").toLowerCase().includes(query));
-  $("#parts-body").innerHTML = rows.map((part) => `<tr><td class="mono">${esc(part.partNumber || "—")}</td><td>${esc(part.name)}</td><td>${esc(part.subsystem)}</td><td><span class="plat ${platformOf(part).toLowerCase()}">${esc(platformOf(part))}</span></td><td>${esc(part.quantity)}</td><td>${part.unitCost ? money(part.unitCost) : "—"}</td><td>${esc(part.location)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
-  $("#parts-empty").style.display = rows.length ? "none" : "block";
+  const shown = query ? rows : [];
+  $("#parts-body").innerHTML = shown.map((part) => `<tr><td class="mono">${esc(part.partNumber || "—")}</td><td>${esc(part.name)}</td><td>${(part.vehicles || []).map((v) => `<span class="pill">${esc(v)}</span>`).join(" ")}</td><td>${esc(part.system || "")}</td><td>${esc(part.assembly || "")}</td><td>${esc(part.quantity)}</td><td>${esc(part.location)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
+  $("#parts-search-table").classList.toggle("hidden", !shown.length);
+  $("#parts-empty").textContent = query ? "No parts match." : "Type a part number, name or material to search every car.";
+  $("#parts-empty").style.display = shown.length ? "none" : "block";
 }
 function renderPurchases() {
   const rows = read("purchases");
@@ -379,7 +377,7 @@ function renderPurchases() {
 function renderJobs() {
   const rows = read("jobs");
   const today = new Date().toISOString().slice(0, 10);
-  $("#jobs-body").innerHTML = rows.map((job) => `<tr><td>${esc(job.name)}${linkLine(job)}</td><td>${esc(job.ownerId ? memberName(job.ownerId) : job.owner || "—")}</td><td>${esc(job.machine || "—")}${job.hours ? `<div class="hint">${esc(job.hours)} h</div>` : ""}</td><td>${esc(job.material)}</td><td class="${job.dueDate && job.dueDate < today && job.status !== "Complete" ? "overdue-text" : ""}">${esc(job.dueDate)}</td><td><span class="priority ${esc(String(job.priority).toLowerCase())}">${esc(job.priority)}</span></td><td>${esc(job.status)}</td><td>${actions("jobs", job)}</td></tr>`).join("");
+  $("#jobs-body").innerHTML = rows.map((job) => `<tr><td>${esc(job.name)}${job.qty > 1 ? ` <span class="hint">×${esc(job.qty)}</span>` : ""}${linkLine(job)}${job.cadUrl ? `<div><a href="${esc(job.cadUrl)}" target="_blank" rel="noopener">CAD</a></div>` : ""}${job.notes ? `<div class="hint">${esc(job.notes)}</div>` : ""}${job.createdBy ? `<div class="hint">requested by ${esc(memberName(job.createdBy))}</div>` : ""}</td><td>${esc(job.ownerId ? memberName(job.ownerId) : job.owner || "Not assigned")}</td><td>${esc(job.machine || "—")}${job.hours ? `<div class="hint">${esc(job.hours)} h</div>` : ""}</td><td>${esc(job.material)}</td><td class="${job.dueDate && job.dueDate < today && job.status !== "Complete" ? "overdue-text" : ""}">${esc(job.dueDate)}</td><td><span class="priority ${esc(String(job.priority).toLowerCase())}">${esc(job.priority)}</span></td><td>${jobChecklistCell(job)}</td><td>${esc(job.status)}</td><td>${actions("jobs", job)}</td></tr>`).join("");
   $("#jobs-empty").style.display = rows.length ? "none" : "block";
 }
 function renderBudgets() {
@@ -393,9 +391,15 @@ function renderApprovals() {
   $("#approvals-body").innerHTML = rows.map((approval) => `<tr><td>${esc(approval.name)}</td><td>${esc(approval.subsystem)}</td><td>${esc(approval.revision)}</td><td>${esc(memberName(approval.createdBy))}</td><td>${esc(approval.reviewer)}</td><td><span class="status">${esc(approval.status)}</span></td><td>${actions("approvals", approval, "Review")}</td></tr>`).join("");
   $("#approvals-empty").style.display = rows.length ? "none" : "block";
 }
+const TEAM_PARAMS = new URLSearchParams(location.search);
+let teamSubteam = SUBTEAMS[TEAM_PARAMS.get("subteam")] ? TEAM_PARAMS.get("subteam") : "";
 function renderTeam() {
-  const team = read("team"); const manage = can("manage", "team");
-  $("#team-count").textContent = `${team.length} members · ${Object.keys(SUBTEAMS).length} subteams`;
+  const everyone = read("team"); const manage = can("manage", "team");
+  const team = teamSubteam ? everyone.filter((m) => (m.subteams || []).includes(teamSubteam)) : everyone;
+  $("#team-count").innerHTML = teamSubteam ? `${esc(teamSubteam)} · ${team.length} members <button class="link" data-op="team-all">Show everyone</button>` : `${everyone.length} members · ${Object.keys(SUBTEAMS).length} subteams`;
+  const subProjects = teamSubteam ? read("projects").filter((p) => p.subteam === teamSubteam && p.status !== "Rejected") : [];
+  const box = $("#team-projects"); box.classList.toggle("hidden", !teamSubteam);
+  box.innerHTML = teamSubteam ? `<span class="label">${esc(teamSubteam)} design projects</span>${subProjects.map((p) => `<a class="person-chip" href="design.html">${esc(p.name)} · ${esc(p.review ? `${p.status} ${p.review.toLowerCase()}` : p.status)}</a>`).join(" ") || '<span class="hint">None</span>'}` : "";
   const subteamCell = (m) => (m.subteams || []).map((t) => `<span class="team-tag${(m.leads || []).includes(t) ? " lead" : ""}">${(m.leads || []).includes(t) ? "★ " : ""}${esc(t)}</span>`).join(" ") || "—";
   $("#team-body").innerHTML = team.map((m) => `<tr><td><strong>${esc(m.name)}</strong></td><td>${esc(m.title || ((m.leads || []).length ? "Subteam Lead" : "Member"))}</td><td>${subteamCell(m)}</td><td>${m.roles.filter((r) => r !== "Subteam Lead").map((r) => `<span class="role-chip">${esc(r)}</span>`).join(" ") || `<span class="hint">—</span>`}</td><td>${manage && team.length > 1 && m.id !== me().id ? `<button class="link danger" data-action="remove-member" data-id="${m.id}">Remove</button>` : ""}</td></tr>`).join("");
   $("#role-guide").innerHTML = `<li><strong>Member</strong> (everyone): add parts, submit purchase requests, shop jobs, and design reviews</li>` + Object.entries(ROLES).map(([r, d]) => `<li><strong>${esc(r)}</strong>: ${esc(d)}</li>`).join("");
@@ -409,8 +413,6 @@ function renderOverview() {
     ...EXT.inbox.flatMap((f) => f(u)),
     ...read("docs").filter((d) => d.status === "In Review" && can("advance", "docs", d)).map((d) => `Document: ${d.number} ${d.title} Rev ${d.revision} is ready to release`),
     ...(isLeader(u) ? read("deliverables").filter((x) => x.dueDate && x.dueDate <= new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10) && read("docs").find((d) => d.id === x.docId)?.status !== "Released").map((x) => `Deliverable: ${x.name} ${x.dueDate < today ? "is overdue" : "is due " + x.dueDate}`) : []),
-    ...projects.filter((p) => p.status === "Proposed" && can("advance", "projects", p)).map((p) => `Project proposal: ${p.name} (${p.subteam}) needs approval`),
-    ...projects.filter((p) => !p.pocId && !["Proposed", "Rejected", "Complete"].includes(p.status) && can("assignPoc", "projects", p)).map((p) => `Project: ${p.name} needs a POC`),
     ...read("tasks").filter((t) => t.assigneeId === u.id && t.status !== "Done").map((t) => `Task: ${t.title} (${projName(t.projectId)}) is ${t.status}${t.dueDate ? `, due ${t.dueDate}` : ""}`),
     ...purchases.filter((p) => p.status !== "Received" && can("advance", "purchases", p)).map((p) => `Purchase: ${p.item} (${money(p.amount)}) is ${p.status}`),
     ...approvals.filter((a) => a.status !== "Approved" && can("advance", "approvals", a)).map((a) => `Design review: ${a.name} ${a.revision} is ${a.status}`),
@@ -513,43 +515,6 @@ function renderProjectForm() {
   const people = $("#project-assignees"); const chosen = [...people.selectedOptions].map((o) => o.value);
   people.innerHTML = [...read("team")].sort((a, b) => a.name.localeCompare(b.name)).map((m) => `<option value="${m.id}" ${chosen.includes(m.id) ? "selected" : ""}>${esc(m.name)}${(m.subteams || []).length ? ` · ${esc(m.subteams.join(", "))}` : ""}</option>`).join("");
 }
-function renderProjects() {
-  const projects = read("projects"); const tasks = read("tasks"); const u = me();
-  const shown = projects.filter((p) => {
-    const f = projectFilter;
-    const stageOk = f === "All" || (f === "Active" ? !["Complete", "Rejected"].includes(p.status) : p.status === f);
-    return stageOk && (!projectMineOnly || onProject(p, u) || tasks.some((t) => t.projectId === p.id && t.assigneeId === u.id));
-  });
-  $("#project-counts").innerHTML = ["Proposed", "Approved", "In Progress", "Review", "Complete", "Rejected"].map((s) => `<span class="count-chip ${stageClass(s)}">${s} <b>${projects.filter((p) => p.status === s).length}</b></span>`).join("");
-  $("#projects-list").innerHTML = shown.map((p) => {
-    const pt = tasks.filter((t) => t.projectId === p.id); const done = pt.filter((t) => t.status === "Done").length; const pct = pt.length ? Math.round(done / pt.length * 100) : 0;
-    const canAssign = can("assign", "projects", p);
-    const people = (p.assignees || []).map((a) => `<span class="person-chip${a === p.pocId ? " poc" : ""}">${a === p.pocId ? "POC · " : ""}${esc(memberName(a))}${canAssign && a !== p.pocId ? `<button class="x" data-action="unassign" data-key="projects" data-id="${p.id}" data-member="${a}" title="Remove from project">×</button>` : ""}</span>`).join(" ") || `<span class="hint">Nobody yet</span>`;
-    const btns = [];
-    if (p.status === "Proposed" && can("advance", "projects", p)) btns.push(`<button class="small" data-action="advance" data-key="projects" data-id="${p.id}">Approve</button><button class="small secondary" data-action="reject" data-key="projects" data-id="${p.id}">Reject</button>`);
-    else if (p.status === "Proposed") btns.push(`<span class="hint">Awaiting approval from the ${esc(p.subteam)} lead or leadership</span>`);
-    else if (p.status === "Rejected" && can("advance", "projects", p)) btns.push(`<button class="small secondary" data-action="advance" data-key="projects" data-id="${p.id}">Resubmit</button>`);
-    else if (can("advance", "projects", p)) btns.push(`<button class="small" data-action="advance" data-key="projects" data-id="${p.id}">Move to ${next.projects[next.projects.indexOf(p.status) + 1]}</button>`);
-    if (can("delete", "projects", p)) btns.push(`<button class="link danger" data-action="delete" data-key="projects" data-id="${p.id}">Delete</button>`);
-    const pocCtl = can("assignPoc", "projects", p) ? `<label class="inline small">POC <select data-poc="${p.id}">${memberOpts(p.assignees || [], p.pocId || "", "— Not set —")}</select></label>` : "";
-    const addCtl = canAssign ? `<label class="inline small">Assign <select data-assign="${p.id}">${memberOpts([], "", "Add a person…")}</select></label>` : "";
-    const taskRows = pt.map((t) => `<tr><td>${esc(t.title)}</td><td>${esc(memberName(t.assigneeId))}</td><td>${esc(t.dueDate || "—")}</td><td><span class="status task-${stageClass(t.status)}">${esc(t.status)}</span></td><td>${can("advance", "tasks", t) ? `<button class="link" data-action="advance" data-key="tasks" data-id="${t.id}">Advance</button>` : ""}${can("delete", "tasks", t) ? `<button class="link danger" data-action="delete" data-key="tasks" data-id="${t.id}">Delete</button>` : ""}</td></tr>`).join("");
-    const taskForm = can("create", "tasks", p) && !["Rejected", "Complete"].includes(p.status) ? `<form class="task-form" data-project="${p.id}"><input name="title" placeholder="New task" required /><select name="assigneeId" required>${memberOpts(p.assignees || [], "", "Assign to…")}</select><input name="dueDate" type="date" /><button class="small">Add task</button></form>` : "";
-    return `<article class="project stage-${stageClass(p.status)}">
-      <header><div><h3>${esc(p.name)}</h3><div class="meta"><span class="team-tag">${esc(p.subteam)}</span><span>Proposed by ${esc(memberName(p.createdBy))}</span>${p.estCost ? `<span>${money(p.estCost)} est.</span>` : ""}${p.targetDate ? `<span>Target ${esc(p.targetDate)}</span>` : ""}</div></div><span class="stage-chip ${stageClass(p.status)}">${esc(p.status)}</span></header>
-      ${p.summary ? `<p class="summary">${esc(p.summary)}</p>` : ""}
-      <div class="people"><span class="label">Team</span>${people}${p.pocId ? "" : `<span class="warn-chip">No POC yet</span>`}</div>
-      ${pocCtl || addCtl ? `<div class="assign-row">${pocCtl}${addCtl}</div>` : ""}
-      <div class="progress-row"><div class="progress"><i style="width:${pct}%"></i></div><span>${done}/${pt.length} tasks · ${pct}%</span></div>
-      ${EXT.projectExtras.map((f) => f(p)).join("")}
-      ${(() => { const pd = read("docs").filter((d) => d.projectId === p.id); return pd.length ? `<div class="people"><span class="label">Docs</span>${pd.map((d) => `<span class="doc-chip doc-${stageClass(d.status)}" title="${esc(d.title)}">${esc(d.number)} Rev ${esc(d.revision)} · ${esc(d.status)}</span>`).join(" ")}</div>` : ""; })()}
-      <details ${pt.length && pt.length <= 6 && p.status !== "Proposed" ? "open" : ""}><summary>Tasks (${pt.length})</summary>${pt.length ? `<div class="table-wrap"><table class="compact"><thead><tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${taskRows}</tbody></table></div>` : `<p class="hint">No tasks yet.</p>`}${taskForm}</details>
-      <footer>${btns.join("")}</footer></article>`;
-  }).join("");
-  $("#projects-empty").style.display = shown.length ? "none" : "block";
-}
-document.querySelectorAll("#project-filter button").forEach((b) => b.addEventListener("click", () => { projectFilter = b.dataset.filter; document.querySelectorAll("#project-filter button").forEach((x) => x.classList.toggle("active", x === b)); renderProjects(); }));
-$("#project-mine").addEventListener("change", (e) => { projectMineOnly = e.target.checked; renderProjects(); });
 document.addEventListener("change", (e) => {
   const poc = e.target.closest("[data-poc]"); const add = e.target.closest("[data-assign]");
   if (!poc && !add) return;
@@ -580,7 +545,7 @@ document.addEventListener("submit", (e) => {
 $("#project-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
-  const project = { id: id(), name: form.get("name"), subteam: form.get("subteam"), summary: form.get("summary"), estCost: form.get("estCost"), targetDate: form.get("targetDate"), assignees: form.getAll("assignees"), pocId: "", status: "Proposed", createdBy: me().id, createdAt: new Date().toISOString() };
+  const project = { id: id(), name: form.get("name"), subteam: form.get("subteam"), summary: form.get("summary"), estCost: form.get("estCost"), targetDate: form.get("targetDate"), assignees: form.getAll("assignees"), pocId: "", status: "Proposed", review: "", history: [{ stage: "Proposed", review: "", at: new Date().toISOString(), by: me().id }], comments: [], createdBy: me().id, createdAt: new Date().toISOString() };
   write("projects", [...read("projects"), project]); logEvent(`proposed project "${project.name}" for ${project.subteam}`); e.target.reset(); renderAll();
 });
 
@@ -591,17 +556,18 @@ const BOM_FIELDS = {
   partNumber: ["part number", "part no", "part no.", "pn", "p/n", "part #", "number", "item number"],
   name: ["name", "part name", "description", "part", "item", "title"],
   quantity: ["qty", "quantity", "count", "qty per"],
-  parent: ["parent", "assembly", "parent assembly", "next assy", "next assembly", "parent part"],
+  parent: ["parent", "parent assembly", "next assy", "next assembly", "parent part"],
+  assembly: ["assembly", "assy", "assembly name"],
   level: ["level", "lvl", "indent", "bom level"],
   subsystem: ["subsystem", "system", "subteam", "category"],
-  platform: ["platform", "car", "vehicle", "used on", "variant"],
+  platform: ["car", "vehicle", "used on", "platform", "variant"],
   unitCost: ["unit cost", "cost", "price", "unit price", "cost each"],
   material: ["material", "mat'l"],
   supplier: ["supplier", "vendor", "source", "manufacturer"],
   location: ["location", "bin", "storage"],
   status: ["status", "state", "lifecycle"]
 };
-const BOM_LABELS = { partNumber: "Part number", name: "Name", quantity: "Qty", parent: "Parent", level: "Level", subsystem: "Subsystem", platform: "Used on", unitCost: "Unit cost", material: "Material", supplier: "Supplier", location: "Location", status: "Status" };
+const BOM_LABELS = { partNumber: "Part number", name: "Name", quantity: "Qty", parent: "Parent", assembly: "Assembly", level: "Level", subsystem: "System", platform: "Car", unitCost: "Unit cost", material: "Material", supplier: "Supplier", location: "Location", status: "Status" };
 let bomPreview = null;
 
 function parseCSV(text) {
@@ -637,7 +603,9 @@ function bomRowsToParts(preview) {
       const lvl = Math.max(0, parseInt(get(r, "level"), 10) || 0);
       stack.length = lvl; parent = lvl > 0 ? stack[lvl - 1] || "" : ""; stack[lvl] = name;
     }
-    out.push({ name, partNumber: get(r, "partNumber"), quantity: String(parseInt(get(r, "quantity"), 10) || 1), parent, subsystem: normSubsystem(get(r, "subsystem")), platform: normPlatform(get(r, "platform")), unitCost: String(parseFloat(String(get(r, "unitCost")).replace(/[^0-9.]/g, "")) || ""), material: get(r, "material"), supplier: get(r, "supplier"), location: get(r, "location") || "Unassigned", status: normStatus(get(r, "status")) });
+    const rawSys = String(get(r, "subsystem")).trim(); const rawCar = String(get(r, "platform")).toUpperCase(); const cars = vehicleNames().filter((v) => rawCar.split(/[\s,+/;]+/).includes(v));
+    const fsae = SYSTEM_NAMES.find((n) => n.toLowerCase() === rawSys.toLowerCase()) || FSAE_SYSTEMS.find((s) => s.code === rawSys.toUpperCase())?.name || "";
+    out.push({ name, partNumber: get(r, "partNumber"), quantity: String(parseInt(get(r, "quantity"), 10) || 1), parent, assembly: get(r, "assembly"), ...(fsae ? { system: fsae } : {}), ...(cars.length ? { vehicles: cars } : {}), subsystem: fsae ? systemOf(fsae).subsystem : normSubsystem(rawSys), platform: normPlatform(get(r, "platform")), unitCost: String(parseFloat(String(get(r, "unitCost")).replace(/[^0-9.]/g, "")) || ""), material: get(r, "material"), supplier: get(r, "supplier"), location: get(r, "location") || "Unassigned", status: normStatus(get(r, "status")) });
   });
   // Parent may be given as a part number; translate to the part's name so the tree links up.
   const nameByPn = Object.fromEntries([...read("parts"), ...out].filter((p) => p.partNumber).map((p) => [p.partNumber, p.name]));
@@ -662,7 +630,7 @@ function renderBomPreview() {
   box.innerHTML = `
     <div class="bom-summary"><strong>${parts.length} parts</strong> from ${esc(source)} · ${updates} match existing part numbers · BOM cost ${money(total)}${missingParents ? ` · <span class="warn-chip">${missingParents} parent${missingParents > 1 ? "s" : ""} not found (they'll sit at top level)</span>` : ""}</div>
     <details open><summary>Column mapping</summary><div class="form-grid bom-map">${selects}</div></details>
-    <div class="table-wrap"><table class="compact"><thead><tr><th>P/N</th><th>Name</th><th>Parent</th><th>Qty</th><th>Subsystem</th><th>Used on</th><th>Unit cost</th></tr></thead><tbody>${parts.slice(0, 12).map((p) => `<tr><td>${esc(p.partNumber || "—")}</td><td>${esc(p.name)}</td><td>${esc(p.parent || "—")}</td><td>${esc(p.quantity)}</td><td>${esc(p.subsystem)}</td><td><span class="plat ${p.platform.toLowerCase()}">${p.platform}</span></td><td>${p.unitCost ? money(p.unitCost) : "—"}</td></tr>`).join("")}</tbody></table></div>
+    <div class="table-wrap"><table class="compact"><thead><tr><th>P/N</th><th>Name</th><th>Assembly</th><th>Qty</th><th>System</th><th>Car</th><th>Unit cost</th></tr></thead><tbody>${parts.slice(0, 12).map((p) => `<tr><td>${esc(p.partNumber || "—")}</td><td>${esc(p.name)}</td><td>${esc(p.assembly || p.parent || "—")}</td><td>${esc(p.quantity)}</td><td>${esc(p.system || p.subsystem)}</td><td>${esc((p.vehicles || [p.platform]).join(", "))}</td><td>${p.unitCost ? money(p.unitCost) : "—"}</td></tr>`).join("")}</tbody></table></div>
     ${parts.length > 12 ? `<p class="hint">…and ${parts.length - 12} more</p>` : ""}
     <div class="bom-actions"><label class="check"><input type="checkbox" id="bom-merge" checked />Update parts whose part number already exists (otherwise add everything as new)</label><button id="bom-import" ${parts.length ? "" : "disabled"}>Import ${parts.length} parts</button><button class="ghost" id="bom-cancel">Cancel</button></div>`;
 }
@@ -675,7 +643,7 @@ function importBom() {
     if (hit) { Object.entries(p).forEach(([k, v]) => { if (v !== "" && !(k === "location" && v === "Unassigned")) hit[k] = v; }); updated++; }
     else { parts.push({ ...p, id: id(), createdAt: new Date().toISOString(), createdBy: me().id }); added++; }
   });
-  write("parts", parts); logEvent(`imported a BOM from ${bomPreview.source}: ${added} added, ${updated} updated`);
+  write("parts", parts); migrateParts(); const synced = read("parts").map(syncPart); synced.filter((p) => !p.partNumber).forEach((p) => { p.partNumber = nextPartNumber(p.vehicles[0], p.system, synced); }); write("parts", synced); ensureAssemblies(); logEvent(`imported a BOM from ${bomPreview.source}: ${added} added, ${updated} updated`);
   flash(`BOM imported: ${added} added, ${updated} updated.`); bomPreview = null; renderAll();
 }
 function downloadFile(name, text, type = "text/csv") {
@@ -683,11 +651,11 @@ function downloadFile(name, text, type = "text/csv") {
 }
 const csvCell = (v) => /[",\n]/.test(String(v ?? "")) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? "");
 function exportBom() {
-  const cols = ["partNumber", "name", "parent", "quantity", "subsystem", "platform", "unitCost", "material", "supplier", "location", "status"];
-  const lines = [cols.map((c) => BOM_LABELS[c] || c).join(","), ...read("parts").map((p) => cols.map((c) => csvCell(p[c])).join(","))];
+  const cols = ["partNumber", "name", "vehicles", "system", "assembly", "quantity", "unitCost", "material", "supplier", "location", "status"];
+  const lines = [cols.map((c) => BOM_LABELS[c] || c).join(","), ...read("parts").map((p) => cols.map((c) => csvCell(Array.isArray(p[c]) ? p[c].join(" ") : p[c])).join(","))];
   downloadFile(`bom-${new Date().toISOString().slice(0, 10)}.csv`, lines.join("\n")); logEvent("exported the BOM");
 }
-const BOM_TEMPLATE = "Level,Part Number,Description,Qty,Subsystem,Used On,Unit Cost,Material,Supplier\n0,SUS-1000,Front suspension assembly,1,Suspension,Both,,,\n1,SUS-1100,Front upright,2,Suspension,Both,320,7075-T6,In-house\n2,SUS-1110,Wheel bearing,2,Suspension,Both,45,,SKF-style vendor\n1,SUS-1200,Upper wishbone,2,Suspension,Both,60,4130 tube,In-house\n";
+const BOM_TEMPLATE = "Part Number,Description,Car,System,Assembly,Qty,Unit Cost,Material,Supplier\n,Front upright,KS10 KS10E,SU,Front corner,2,320,7075-T6,In-house\n,Upper wishbone,KS10 KS10E,SU,Front corner,2,60,4130 tube,In-house\n,Wheel bearing,KS10 KS10E,WT,Hub & bearing,4,45,,Bearing vendor\n";
 $("#bom-file").addEventListener("change", (e) => { const f = e.target.files[0]; if (!f) return; f.text().then((t) => loadBomText(t, f.name)); e.target.value = ""; });
 $("#bom-paste-go").addEventListener("click", () => { const t = $("#bom-paste").value.trim(); if (t) loadBomText(t, "pasted text"); });
 $("#bom-template").addEventListener("click", () => downloadFile("bom-template.csv", BOM_TEMPLATE));
@@ -771,7 +739,7 @@ const PROCESSES = {
   jobs: { view: "machine-shop", label: (r) => r.name, role: "Shop Lead", loop: "rework" },
   parts: { view: "parts", label: (r) => r.name, role: "Anyone", loop: "rebuild" },
   docs: { view: "documents", label: (r) => `${r.number} ${r.title} Rev ${r.revision}`, role: ["Author or lead", "Design Review Approver / lead"], loop: "new revision" },
-  projects: { view: "projects", label: (r) => r.name, role: ["Subteam lead / leadership", "POC or lead", "POC or lead", "POC or lead"], loop: null }
+  projects: { view: "projects", label: (r) => `${r.name}${r.review ? ` · ${r.review}` : ""}`, role: ["Subteam lead starts PP1", "Subteam ✓ then Chief ✓", "Subteam ✓ then Chief ✓", "Subteam ✓ then Chief ✓ = approval"], loop: null }
 };
 function renderProcess(key) {
   const box = $(`#process-${key}`); const cfg = PROCESSES[key];
@@ -789,7 +757,7 @@ function renderProcess(key) {
 const renderProcesses = () => Object.keys(PROCESSES).forEach(renderProcess);
 
 // ---------- Org map (React Flow) ----------
-let orgFocus = "";
+let orgFocus = new URLSearchParams(location.search).get("member") || "";
 function renderOrg() {
   const box = $("#org-flow");
   if (!onPage("#org-flow")) return;
@@ -803,13 +771,13 @@ $("#org-focus").addEventListener("change", (e) => { orgFocus = e.target.value; r
 
 function flash(text) { const el = $("#toast"); el.textContent = text; el.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.remove("show"), 3200); }
 
-const PAGE_RENDERS = [["#parent-select", () => renderParentOptions()], ["#parts-tree", () => { renderTree(); renderVenn(); renderAssemblyMode(); }], ["#parts-body", () => renderParts()], ["#purchases-body", () => renderPurchases()], ["#jobs-body", () => renderJobs()], ["#budget-list", () => renderBudgets()], ["#approvals-body", () => renderApprovals()], ["#team-body", () => renderTeam()], ["#stats", () => renderOverview()], ["#projects-list", () => { renderProjectForm(); renderProjects(); }], ["#docs-body", () => { renderDocForm(); renderDocs(); renderDeliverables(); }], ["#bom-preview", () => renderBomPreview()], [".flow.short", () => renderProcesses()], ["#org-flow", () => renderOrg()]];
+const PAGE_RENDERS = [["#parent-select", () => renderParentOptions()], ["#parts-tree", () => { renderTree(); renderVenn(); renderAssemblyMode(); }], ["#parts-body", () => renderParts()], ["#purchases-body", () => renderPurchases()], ["#jobs-body", () => renderJobs()], ["#budget-list", () => renderBudgets()], ["#approvals-body", () => renderApprovals()], ["#team-body", () => renderTeam()], ["#stats", () => renderOverview()], ["#project-form", () => renderProjectForm()], ["#docs-body", () => { renderDocForm(); renderDocs(); renderDeliverables(); }], ["#bom-preview", () => renderBomPreview()], [".flow.short", () => renderProcesses()], ["#org-flow", () => renderOrg()]];
 // EXT.renders entries are either a function (always runs) or [selector, fn] (runs when that element is on this page).
 const renderAll = () => { renderUser(); PAGE_RENDERS.forEach(([sel, fn]) => { if (onPage(sel)) fn(); }); EXT.renders.forEach((r) => { if (typeof r === "function") r(); else if (onPage(r[0])) r[1](); }); };
 
 // ---------- Forms & actions ----------
 const labelOf = (key, row) => row.name || row.item || row.category || row.title || "item";
-const nouns = { parts: "part", purchases: "purchase request", jobs: "shop job", budgets: "budget allocation", approvals: "design review", projects: "project", tasks: "task", docs: "document" };
+const nouns = { parts: "part", purchases: "purchase request", jobs: "machining request", budgets: "budget allocation", approvals: "design review", projects: "project", tasks: "task", docs: "document" };
 const setupForm = (selector, key, defaults = {}) => $(selector).addEventListener("submit", (event) => {
   event.preventDefault();
   if (!can("create", key)) { flash("Your roles don't allow this."); return; }
