@@ -622,3 +622,37 @@ a.button-link { display: inline-flex; align-items: center; padding: 8px 14px; bo
 .guide-toc a { padding: 4px 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 999px; font-size: 13px; text-decoration: none; }
 .guide-card ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
 .bug-btn { font-size: 18px; padding: 6px 10px; }
+
+/* Manufacturing job cards */
+.job-cards { display: grid; gap: 14px; }
+.job-card { border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 14px 16px; }
+.job-card.complete { opacity: .7; }
+.job-card header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.job-card h3 { margin: 0 0 2px; font-size: 1rem; }
+.job-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 13px; }
+.checklist { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line, #e2e8f0); }
+.checklist-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.checklist-head .progress { width: 120px; }
+.checklist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.checklist li { display: flex; gap: 10px; align-items: center; padding: 5px 6px; border-radius: 8px; font-size: 14px; }
+.checklist li.current { background: rgba(225, 29, 72, .06); }
+.checklist li.done > span { text-decoration: line-through; text-decoration-color: rgba(148, 163, 184, .7); }
+.checklist li small { margin-left: 8px; color: var(--muted, #64748b); font-size: 12px; }
+.checklist .tick { flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1.5px solid var(--line, #94a3b8); background: transparent; color: inherit; font-size: 12px; line-height: 1; }
+.checklist li.done .tick { background: #0d8273; border-color: #0d8273; color: #fff; }
+.checklist li.current .tick:not(:disabled) { border-color: var(--accent, #e11d48); cursor: pointer; }
+.mfg-add { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line, #e2e8f0); }
+.mfg-add h3 { margin: 0 0 8px; font-size: .95rem; }
+/* Multi-select name picker */
+.msel { position: relative; }
+.msel summary { list-style: none; cursor: pointer; min-height: 32px; padding: 4px 28px 4px 8px; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.msel summary::after { content: "▾"; position: absolute; right: 10px; top: 8px; color: var(--muted, #64748b); }
+.msel summary::-webkit-details-marker { display: none; }
+.msel-panel { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 4px; padding: 8px; border: 1px solid var(--line, #e2e8f0); border-radius: 10px; background: var(--surface, #fff); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.msel-search { width: 100%; margin-bottom: 6px; }
+.msel-list { max-height: 220px; overflow: auto; display: grid; }
+.msel-opt { display: flex !important; grid: none; align-items: center; gap: 8px; margin: 0 !important; padding: 4px 6px; font-weight: 400 !important; border-radius: 6px; cursor: pointer; }
+.msel-opt:hover { background: rgba(148, 163, 184, .12); }
+.roles-list { display: grid; gap: 4px; margin-top: 6px; }
+.roles-list label { display: grid !important; grid-template-columns: 1fr 1fr; align-items: center; font-weight: 400 !important; margin: 0 !important; }
+.checklist .tick { border-color: rgba(148, 163, 184, .6); }

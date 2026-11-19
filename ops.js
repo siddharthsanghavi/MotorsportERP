@@ -295,7 +295,6 @@ OPS.fail = (b) => {
   });
 };
 EXT.renders.push(["#life-body", renderLife]);
-EXT.inbox.push((u) => tracked().filter((p) => lifeState(p).cls === "bad" && (leads(p.subsystem, u) && (u.leads || []).length || isLeader(u))).map((p) => `Part: ${p.name} — ${lifeState(p).text} (${Math.round(p.kmUsed || 0)} km)`));
 
 // =====================================================================
 // Training sign-offs. Machines and some tools need a sign-off before use.
@@ -497,7 +496,7 @@ EXT.seeds.push((team) => {
 });
 
 ensureTrainings();
-// Arrivals from another page: a pending "Order" or a scanned part. Called from events.js after the first render.
+// Arrivals from another page: a pending "Order" or a scanned part. Called from boot.js after the first render.
 function handleArrivals() {
 try { const pending = sessionStorage.getItem("merp-order-part"); if (pending && onPage("#purchase-form")) { sessionStorage.removeItem("merp-order-part"); orderPart(pending); } } catch { /* storage blocked */ }
 const findParam = new URLSearchParams(location.search).get("find");

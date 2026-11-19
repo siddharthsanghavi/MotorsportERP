@@ -105,7 +105,7 @@ function renderPartsBrowser() {
   if (pb.asm) crumb.push(`<strong>${esc(pb.asm)}</strong>`);
   $("#pb-crumbs").innerHTML = crumb.join('<span class="crumb-sep">›</span>');
   const carParts = pb.car ? parts.filter((p) => onVehicle(p, pb.car)) : [];
-  $("#pb-export").classList.toggle("hidden", !pb.car); $("#pb-export").textContent = pb.car ? `Export ${pb.car} cost BOM (CSV)` : "";
+  $("#pb-export").classList.toggle("hidden", !pb.car); $("#pb-export").textContent = pb.car ? `Export ${pb.car} cost report BOM (CSV)` : "";
 
   if (!pb.car) {
     box.innerHTML = `<div class="car-grid">${cars.map((c) => { const ps = parts.filter((p) => onVehicle(p, c.name)); const nAsm = asms.filter((a) => a.vehicles.includes(c.name)).length;
@@ -130,16 +130,15 @@ function renderPartsBrowser() {
   }
   const ps = carParts.filter((p) => p.system === pb.sys && p.assembly === pb.asm).sort((a, b) => String(a.partNumber).localeCompare(String(b.partNumber)));
   const others = cars.filter((c) => c.name !== pb.car);
-  box.innerHTML = `<div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Qty</th><th>Material</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody>${ps.map((p) => `<tr><td class="mono">${esc(p.partNumber || "—")}</td><td>${esc(p.name)}${p.safetyCritical ? ` <span class="sc-chip" title="Safety-critical">SC</span>` : ""}</td><td>${esc(p.quantity)}</td><td>${esc(p.material || "—")}</td><td>${esc(p.location || "—")}</td><td><span class="status">${esc(p.status)}</span></td><td>${actions("parts", p)}</td></tr>`).join("")}</tbody></table></div>
+  box.innerHTML = `<div class="table-wrap"><table><thead><tr><th>P/N</th><th>Part</th><th>Qty</th><th>Material</th><th>Status</th><th></th></tr></thead><tbody>${ps.map((p) => `<tr><td class="mono">${esc(p.partNumber || "—")}</td><td>${esc(p.name)}</td><td>${esc(p.quantity)}</td><td>${esc(p.material || "—")}</td><td><span class="status">${esc(p.status)}</span></td><td>${actions("parts", p)}</td></tr>`).join("")}</tbody></table></div>
     ${ps.length ? "" : `<p class="empty">No parts in this assembly yet.</p>`}
     ${canEditParts() ? `<form id="pb-part-form" class="form-grid pb-part-form">
       <label>Part name<input name="name" required /></label>
       <label>Part number<input name="partNumber" placeholder="${esc(nextPartNumber(pb.car, pb.sys))} (auto)" /></label>
       <label>Qty<input name="quantity" type="number" min="1" value="1" required /></label>
       <label>Material<input name="material" /></label>
-      <label>Location<input name="location" placeholder="Car / Shop / Storage" /></label>
       <label>Status<select name="status">${next.parts.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label>
-      <button>Add part</button></form><p class="hint">Leave the part number blank to get the next one. Costs for the cost report are set with Edit.</p>` : ""}`;
+      <button>Add part</button></form><p class="hint">Leave the part number blank to get the next one.</p>` : ""}`;
 }
 
 document.addEventListener("click", (e) => {
@@ -156,7 +155,7 @@ document.addEventListener("submit", (e) => {
   if (e.target.id === "pb-part-form") {
     e.preventDefault(); if (!canEditParts()) return flash("Your roles don't allow this.");
     const f = new FormData(e.target); const parts = read("parts");
-    const p = syncPart({ id: id(), name: f.get("name").trim(), partNumber: f.get("partNumber").trim() || nextPartNumber(pb.car, pb.sys, parts), quantity: f.get("quantity") || "1", material: f.get("material"), location: f.get("location") || "Unassigned", status: f.get("status"), system: pb.sys, assembly: pb.asm, vehicles: [pb.car], parent: "", createdBy: me().id, createdAt: new Date().toISOString() });
+    const p = syncPart({ id: id(), name: f.get("name").trim(), partNumber: f.get("partNumber").trim() || nextPartNumber(pb.car, pb.sys, parts), quantity: f.get("quantity") || "1", material: f.get("material"), status: f.get("status"), system: pb.sys, assembly: pb.asm, vehicles: [pb.car], parent: "", createdBy: me().id, createdAt: new Date().toISOString() });
     write("parts", [...parts, p]); ensureAssemblies(); logEvent(`added part ${p.partNumber} ${p.name}`); renderAll();
   }
 });
@@ -165,13 +164,12 @@ OPS["add-car"] = () => openForm("Add a car", [["name", "Car name (e.g. KS11E)", 
   write("vehicles", [...vehicles(), { id: id(), name, platform: v.platform }]); logEvent(`added car ${name}`); renderAll();
 });
 
-// FSAE cost-event BOM: one row per part, grouped by system then assembly. Paste or upload into the cost system.
+// FSAE cost-report BOM structure (no costs): one row per part, grouped by system then assembly.
 function exportCostBom(car) {
-  const head = ["System", "Assembly", "Part Number", "Part", "Qty", "Material", "Material Cost Each", "Process Cost Each", "Fasteners Each", "Tooling", "Extended Cost"];
+  const head = ["System", "Assembly", "Part Number", "Part", "Qty", "Material"];
   const order = (p) => SYSTEM_NAMES.indexOf(p.system);
   const rows = read("parts").filter((p) => onVehicle(p, car)).sort((a, b) => order(a) - order(b) || a.assembly.localeCompare(b.assembly) || String(a.partNumber).localeCompare(String(b.partNumber))).map((p) => {
-    const q = Number(p.quantity || 1); const n = (k) => Number(p[k] || 0);
-    return [p.system, p.assembly, p.partNumber || "", p.name, q, p.material || "", n("unitCost").toFixed(2), n("processCost").toFixed(2), n("fastenerCost").toFixed(2), n("toolingCost").toFixed(2), ((n("unitCost") + n("processCost") + n("fastenerCost")) * q + n("toolingCost")).toFixed(2)];
+    return [p.system, p.assembly, p.partNumber || "", p.name, Number(p.quantity || 1), p.material || ""];
   });
   downloadFile(`${car}-cost-bom-${todayISO()}.csv`, [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n")); logEvent(`exported the ${car} cost BOM`);
 }
@@ -181,7 +179,7 @@ $("#pb-export").addEventListener("click", () => pb.car && exportCostBom(pb.car))
 EDIT_FIELDS.parts = (row) => {
   const names = vehicleNames(); const combos = names.map((n) => [n, n]);
   const asmNames = [...new Set(read("assemblies").filter((a) => a.system === row.system).map((a) => a.name))].sort();
-  return [["partNumber", "Part number", "text"], ["name", "Name", "text"], ["vehiclesStr", "Car", "select", combos], ["system", "System", "select", SYSTEM_NAMES], ["assembly", "Assembly", "select", asmNames.includes(row.assembly) ? asmNames : [row.assembly, ...asmNames]], ["quantity", "Quantity", "number"], ["location", "Location", "text"], ["material", "Material", "text"], ["supplier", "Supplier", "select", vendorOptions(row?.supplier)], ["unitCost", "Material cost each ($)", "number"], ["processCost", "Process cost each ($)", "number"], ["fastenerCost", "Fasteners each ($)", "number"], ["toolingCost", "Tooling (one-off, $)", "number"], ["safetyCritical", "Safety-critical part", "checkbox"], ["lifeLimitKm", "Life limit (km)", "number"], ["inspectEveryKm", "Inspect every (km)", "number"], ["kmUsed", "Km used so far", "number"]];
+  return [["partNumber", "Part number", "text"], ["name", "Name", "text"], ["vehiclesStr", "Car", "select", combos], ["system", "System", "select", SYSTEM_NAMES], ["assembly", "Assembly", "select", asmNames.includes(row.assembly) ? asmNames : [row.assembly, ...asmNames]], ["quantity", "Quantity", "number"], ["material", "Material", "text"]];
 };
 const partFormValues = (row) => ({ ...row, vehiclesStr: partVehicles(row).join(",") });
 function prepPartEdit(row, vals) {

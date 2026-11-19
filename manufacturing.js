@@ -12,13 +12,13 @@ const partLeadIds = (job) => {
 
 // [text, who can tick: "lead" = manufacturing lead only, "shop" = machinist or lead]
 const JOB_STEPS = [
-  ["Manufacturing lead fills out the job (machinist, machine, material, tolerances)", "lead"],
-  ["Add the part to Fusion Hub in its own folder (or the existing part folder)", "shop"],
-  ["CAM the part and get it approved by the manufacturing lead (in the dev parts folder)", "lead"],
-  ["Run the jobs on the associated machine", "shop"],
-  ["Deburr and check each one is in tolerance", "shop"],
-  ["Put in a labelled bag in the middle red cabinet", "shop"],
-  ["Tell the responsible lead/engineer and the manufacturing lead in part-update that it's done", "shop"]
+  ["[Manufacturing lead will fill this out]", "lead"],
+  ["Add part to Fusion Hub in its own folder (or add to existing part folder)", "shop"],
+  ["CAM part and get approval after CAMing from the manufacturing lead (in dev parts folder)", "lead"],
+  ["Run jobs on associated machine", "shop"],
+  ["Deburr & make sure each is in tolerance", "shop"],
+  ["Put in labeled baggy & put in middle red cabinet", "shop"],
+  ["Tell the responsible lead/engineer and the manufacturing lead in \"part-update\" that it's done", "shop"]
 ];
 // Status follows the checklist: running the job starts it, the tolerance check is QC, the last step completes it.
 const STATUS_AT = { 3: "In Progress", 4: "Quality Check", 6: "Complete" };
@@ -71,7 +71,8 @@ EXT.inbox.push((u) => [
 // Leaders can edit jobs too (to assign the machinist and machine).
 const _canEdit = canEdit;
 canEdit = (key, row) => (key === "jobs" && row && isShopBoss()) || _canEdit(key, row);
-EXT.can.push((action, key) => (key === "jobs" && action === "advance" && isShopBoss()) ? true : undefined);
+// Status follows the checklist, so there is no separate Advance button on jobs.
+EXT.can.push((action, key) => (key === "jobs" && action === "advance") ? false : undefined);
 
 // ---------------------------------------------------------------------
 // Tooling & consumables.
@@ -121,4 +122,21 @@ EXT.seeds.push((team) => {
   write("jobs", jobs);
 });
 
+// The queue: one card per job with its checklist open, like the shop's planner board.
+renderJobs = function () {
+  const jobs = [...read("jobs")].sort((a, b) => (a.status === "Complete") - (b.status === "Complete") || String(a.dueDate).localeCompare(String(b.dueDate))); const today = todayISO();
+  $("#jobs-body").innerHTML = jobs.map((job) => {
+    const done = jobDone(job); const cur = JOB_STEPS.findIndex((_, k) => !(job.checklist || [])[k]);
+    const steps = JOB_STEPS.map(([text, who], k) => {
+      const s = (job.checklist || [])[k]; const canDo = !s && k === cur && canTick(job, k); const canUndo = s && k === (cur < 0 ? JOB_STEPS.length : cur) - 1 && canTick(job, k);
+      return `<li class="${s ? "done" : ""}${k === cur ? " current" : ""}"><button class="tick" ${canDo || canUndo ? "" : "disabled"} data-op="job-step" data-id="${job.id}" data-step="${k}" aria-label="${s ? "Undo" : "Mark done"}: ${esc(text)}">${s ? "✓" : ""}</button><span>${esc(text)}${who === "lead" ? ' <span class="pill">lead</span>' : ""}${s ? `<small>${esc(memberName(s.by))} · ${esc(s.at.slice(0, 10))}</small>` : ""}</span></li>`;
+    }).join("");
+    return `<article class="job-card ${job.status === "Complete" ? "complete" : ""}"><header><div><h3>${esc(job.name)}${Number(job.qty) > 1 ? ` <span class="hint">×${esc(job.qty)}</span>` : ""}</h3>
+      <div class="hint">${linkLine(job)}${job.createdBy ? ` requested by ${esc(memberName(job.createdBy))}` : ""}${job.cadUrl ? ` · <a href="${esc(job.cadUrl)}" target="_blank" rel="noopener">CAD</a>` : ""}</div>
+      <div class="job-meta"><span>Machinist: <b>${esc(job.ownerId ? memberName(job.ownerId) : "not assigned")}</b></span><span>Machine: <b>${esc(job.machine || "—")}</b></span>${job.material ? `<span>Material: <b>${esc(job.material)}</b></span>` : ""}<span class="${job.dueDate && job.dueDate < today && job.status !== "Complete" ? "overdue-text" : ""}">Due ${esc(job.dueDate || "—")}</span><span class="priority ${esc(String(job.priority).toLowerCase())}">${esc(job.priority || "")}</span><span class="status">${esc(job.status)}</span></div>
+      ${job.notes ? `<p class="hint">${esc(job.notes)}</p>` : ""}</div><div class="row-actions">${actions("jobs", job)}</div></header>
+      <div class="checklist"><div class="checklist-head"><strong>Checklist (${done} of ${JOB_STEPS.length} items done)</strong><span class="progress"><i style="width:${done / JOB_STEPS.length * 100}%"></i></span></div><ol>${steps}</ol></div></article>`;
+  }).join("");
+  $("#jobs-empty").style.display = jobs.length ? "none" : "block";
+};
 EXT.renders.push(() => { notifyNewRequests(); checkLowStock(); }, ["#mfg-stock-body", renderMfgStock]);

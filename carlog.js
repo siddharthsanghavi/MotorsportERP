@@ -35,7 +35,7 @@ function renderCarLog() {
   const toe = (end) => `<div class="sheet-pair">${["l", "r"].map((side) => kv([[`${end}Toe.${side}.front`, "Front toe"], [`${end}Toe.${side}.rear`, "Rear toe"]], "salmon")).join("")}</div>`;
   const wing = (w) => `<div class="sheet-pair">${kv([[`${w}.flEp`, "FL EP height"], [`${w}.rlEp`, "RL EP height"]], "blue")}${kv([[`${w}.frEp`, "FR EP height"], [`${w}.rrEp`, "RR EP height"]], "blue")}</div>`;
   const ev = s.car === "EV";
-  const drivers = String(L.people?.drivers || memberName(s.driverId) || "").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+  const P = peopleOf(s); const drivers = P.driverIds.map(memberName);
 
   card.innerHTML = `
     <div class="list-header"><div><p class="eyebrow">CAR LOG</p><h2>${esc(carName(s.car))} · ${esc(s.type)} · ${esc(s.date)}</h2><p class="hint">${esc(s.location || "")} Saves as you type.${L.updatedBy ? ` Last edited by ${esc(memberName(L.updatedBy))}.` : ""}</p></div><div class="row-actions"><button class="secondary" data-op="car-log-copy">Copy setup from last ${esc(carName(s.car))} session</button><button class="ghost" data-op="car-log-close">Close</button></div></div>
@@ -47,10 +47,10 @@ function renderCarLog() {
         <label>Any current issues we know of?${area("plan.knownIssues")}</label>
         <label>Car run order${area("plan.runOrder", "Driver A: 3 laps warm-up, then …")}</label></div>
       <div><h3>Personnel</h3>
-        <table class="log-table"><tr><th>Testing lead</th><td><select data-log="people.leadId">${memberSelect(L.people?.leadId || "", "— Select —")}</select></td></tr>
-        <tr><th>Driver(s)</th><td>${inp("people.drivers", memberName(s.driverId) || "Names, comma separated")}</td></tr>
-        <tr><th>ESO(s)</th><td>${inp("people.esos")}</td></tr>
-        <tr><th>Other personnel<br><small>Name (role)</small></th><td>${area("people.other")}</td></tr></table>
+        <table class="log-table"><tr><th>Testing lead</th><td>${multiPick("people.leadIds", P.leadIds)}</td></tr>
+        <tr><th>Driver(s)</th><td>${multiPick("people.driverIds", P.driverIds)}</td></tr>
+        <tr><th>ESO(s)</th><td>${multiPick("people.esoIds", P.esoIds)}</td></tr>
+        <tr><th>Other personnel<br><small>Name (role)</small></th><td>${multiPick("people.otherIds", P.otherIds)}${P.otherIds.length ? `<div class="roles-list">${P.otherIds.map((oid) => `<label class="inline">${esc(memberName(oid))}${inp(`people.roles.${oid}`, "role")}</label>`).join("")}</div>` : ""}</td></tr></table>
         <h3>Outside conditions</h3>
         <table class="log-table"><tr><th>Time of test</th><td>${inp("conditions.time", "", "time")}</td></tr><tr><th>Outside temp (°F)</th><td>${inp("conditions.temp", "", "number")}</td></tr><tr><th>Actively raining</th><td>${yn("conditions.raining")}</td></tr><tr><th>Damp track</th><td>${yn("conditions.damp")}</td></tr><tr><th>Wind (mph)</th><td>${inp("conditions.wind", "optional", "number")}</td></tr></table></div>
     </div>
@@ -72,7 +72,7 @@ function renderCarLog() {
     </div>
 
     <div class="log-grid">
-      <div><h3>Laps completed</h3><table class="log-table">${(drivers.length ? drivers : ["Driver 1", "Driver 2"]).map((d, i) => `<tr><th>${esc(d)}</th><td>${inp(`laps.${i}`, "", "number")}</td></tr>`).join("")}</table>
+      <div><h3>Laps completed</h3><table class="log-table">${P.driverIds.length ? P.driverIds.map((did) => `<tr><th>${esc(memberName(did))}</th><td>${inp(`laps.${did}`, "", "number")}</td></tr>`).join("") : '<tr><td class="hint">Pick the drivers under Personnel.</td></tr>'}</table>
         <h3>Timing sheet</h3><label>Link to the timing sheet${inp("timingUrl", "https://… Autocross_Timing_Sheet.xlsx", "url")}</label>${safeUrl(L.timingUrl) ? `<a href="${esc(L.timingUrl)}" target="_blank" rel="noopener">Open timing sheet</a>` : ""}
         <h3>Data <span class="pill">Roadmap</span></h3><p class="hint">Importing an MCAP CSV export into the session (channels, lap times, faults) is planned. For now, put the log link in the session's Data link.</p></div>
       <div><h3>Conclusion</h3><p class="hint">How did the car perform? Any failures? Did it complete the test? What needs fixing? Drivability, scraping, car faults (inverter, IMD, BMS…).</p>${area("conclusion")}</div>
@@ -86,7 +86,7 @@ function saveLog(path, value) {
 document.addEventListener("change", (e) => {
   const el = e.target.closest("[data-log]"); if (!el || !onPage("#car-log")) return;
   saveLog(el.dataset.log, el.type === "checkbox" ? el.checked : el.value);
-  if (el.type === "radio" || el.type === "checkbox" || el.dataset.log === "people.drivers" || el.dataset.log === "timingUrl") renderCarLog();
+  if (el.type === "radio" || el.type === "checkbox" || el.dataset.log === "timingUrl") renderCarLog();
 });
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-sheet]"); if (b && onPage("#car-log")) { sheetTab = b.dataset.sheet; renderCarLog(); } });
 OPS["car-log-setdown"] = () => { const list = read("sessions"); const s = list.find((x) => x.id === logId); s.log ||= {}; s.log.setdown = JSON.parse(JSON.stringify({ ...(s.log.setup || {}), name: "Setdown", voltage: "" })); write("sessions", list); renderCarLog(); flash("Setdown starts from the setup values. Change what moved."); };
@@ -105,6 +105,29 @@ document.addEventListener("submit", (e) => {
   setTimeout(() => { const fresh = read("sessions").find((x) => !before.has(x.id)); if (fresh) openLog(fresh.id); }, 0);
 }, true);
 
+// People are stored as member ids. Older logs kept free text, which is matched to names where possible.
+function peopleOf(s) {
+  const p = s.log?.people || {}; const team = read("team"); const byName = (txt) => String(txt || "").split(/[,;\n]/).map((x) => x.trim().toLowerCase()).filter(Boolean).map((n) => team.find((m) => m.name.toLowerCase() === n)?.id).filter(Boolean);
+  return { leadIds: p.leadIds || (p.leadId ? [p.leadId] : []), driverIds: p.driverIds || (p.drivers ? byName(p.drivers) : s.driverId ? [s.driverId] : []), esoIds: p.esoIds || byName(p.esos), otherIds: p.otherIds || byName(p.other) };
+}
+// Dropdown with a search box and a checkbox per member; the summary lists who's picked.
+function multiPick(path, ids) {
+  const team = [...read("team")].sort((a, b) => a.name.localeCompare(b.name)); const picked = team.filter((m) => ids.includes(m.id)); const rest = team.filter((m) => !ids.includes(m.id));
+  const row = (m) => `<label class="msel-opt"><input type="checkbox" data-log-multi="${path}" value="${m.id}" ${ids.includes(m.id) ? "checked" : ""} />${esc(m.name)}</label>`;
+  return `<details class="msel" data-msel="${path}"><summary>${picked.length ? picked.map((m) => `<span class="pill">${esc(m.name)}</span>`).join(" ") : '<span class="hint">Select names…</span>'}</summary><div class="msel-panel"><input type="search" class="msel-search" placeholder="Search names" /><div class="msel-list">${[...picked, ...rest].map(row).join("")}</div></div></details>`;
+}
+document.addEventListener("change", (e) => {
+  const cb = e.target.closest("[data-log-multi]"); if (!cb || !onPage("#car-log")) return;
+  const box = cb.closest(".msel"); const ids = [...box.querySelectorAll("[data-log-multi]:checked")].map((x) => x.value);
+  saveLog(cb.dataset.logMulti, ids);
+  box.querySelector("summary").innerHTML = ids.length ? ids.map((i) => `<span class="pill">${esc(memberName(i))}</span>`).join(" ") : '<span class="hint">Select names…</span>';
+});
+document.addEventListener("input", (e) => { const q = e.target.closest(".msel-search"); if (!q) return; const t = q.value.toLowerCase(); q.closest(".msel").querySelectorAll(".msel-opt").forEach((o) => { o.hidden = !o.textContent.toLowerCase().includes(t); }); });
+// Redraw when a picker closes, so the laps table and role boxes follow the names chosen.
+document.addEventListener("toggle", (e) => { if (e.target.matches?.(".msel") && !e.target.open && onPage("#car-log")) renderCarLog(); }, true);
+// Only one picker open at a time.
+document.addEventListener("toggle", (e) => { if (e.target.matches?.(".msel") && e.target.open) document.querySelectorAll(".msel[open]").forEach((d) => { if (d !== e.target) d.open = false; }); }, true);
+
 // Demo: a filled-in car log on the most recent EV session.
 EXT.seeds.push((team) => {
   const list = read("sessions"); const s = [...list].filter((x) => x.car === "EV").sort((a, b) => b.date.localeCompare(a.date))[0]; if (!s) return;
@@ -118,11 +141,11 @@ EXT.seeds.push((team) => {
     rearShocks: { l: { lsb: "9", lsr: "11", hsb: "5", hsr: "7", springLength: "150" }, r: { lsb: "9", lsr: "11", hsb: "5", hsr: "7", springLength: "150" } } };
   s.log = {
     plan: { test: `${s.type} run, 22 laps`, reason: "Check accumulator temps over a full stint", knownIssues: "Inverter derated at the last shakedown", runOrder: "Driver 1: 11 laps, swap, Driver 2: 11 laps" },
-    people: { leadId: lead.id, drivers: memberName(s.driverId), esos: "", other: "" },
+    people: { leadIds: [lead.id], driverIds: [s.driverId, ...team.filter((m) => (m.subteams || []).includes("Vehicle Dynamics") && m.id !== s.driverId).slice(0, 1).map((m) => m.id)].filter(Boolean), esoIds: team.filter((m) => (m.subteams || []).includes("Low Voltage")).slice(0, 1).map((m) => m.id), otherIds: [], roles: {} },
     conditions: { time: "14:30", temp: "68", raining: "No", damp: "No", wind: "" },
     checks: CAR_CHECKS.map((_, i) => ({ done: true, issue: i === 6 ? "Yes" : "No", notes: i === 6 ? "Topped up coolant, small air bubble" : "" })),
     setup: base, setdown: { ...JSON.parse(JSON.stringify(base)), name: "Setdown", voltage: "521", fl: { ...base.fl, tirePress: "14" }, fr: { ...base.fr, tirePress: "14" } },
-    laps: { 0: s.laps }, timingUrl: "", conclusion: "Completed the full stint. Accumulator stayed under 52 °C. No faults. Slight understeer mid-corner; try a softer front bar next time.", updatedBy: lead.id
+    laps: { [s.driverId]: s.laps }, timingUrl: "", conclusion: "Completed the full stint. Accumulator stayed under 52 °C. No faults. Slight understeer mid-corner; try a softer front bar next time.", updatedBy: lead.id
   };
   write("sessions", list);
 });

@@ -20,12 +20,10 @@
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
         <a class="tab" href="design.html"><span>Design</span></a>
-        <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
         <a class="tab" href="assembly.html"><span>Assembly</span></a>
         <a class="tab" href="documents.html"><span>Documents</span></a>
-        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
         <a class="tab active" href="machine-shop.html" aria-current="page"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
@@ -45,10 +43,10 @@
         <div class="card"><h2>Request a part to be machined</h2><p class="hint">Anyone can ask. The manufacturing lead fills out the rest (machinist, machine, tolerances) and the job then follows the shop checklist.</p>
           <form id="job-form" class="form-grid"><label>Part / job<input name="name" required /></label><label>For part<select name="partId" id="job-part"></select></label><label>For project<select name="projectId" id="job-project"></select></label><label>Quantity<input name="qty" type="number" min="1" value="1" /></label><label>Material<input name="material" placeholder="7075-T6, steel..." /></label><label>Needed by<input name="dueDate" type="date" required /></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Critical</option></select></label><label>Drawing / CAD link<input name="cadUrl" type="url" placeholder="Fusion Hub link" /></label><label class="wide">Notes<input name="notes" placeholder="Tolerances, finish, anything the shop should know" /></label><button>Send request</button></form>
         </div>
-        <div class="card"><h2>Manufacturing queue</h2><div class="table-wrap"><table><thead><tr><th>Job</th><th>Machinist</th><th>Machine</th><th>Material</th><th>Due</th><th>Priority</th><th>Checklist</th><th>Status</th><th></th></tr></thead><tbody id="jobs-body"></tbody></table></div><p id="jobs-empty" class="empty">No machining requests yet.</p></div>
+        <div class="card"><h2>Manufacturing queue</h2><div id="jobs-body" class="job-cards"></div><p id="jobs-empty" class="empty">No machining requests yet.</p></div>
         <div class="card"><div class="list-header"><div><h2>Tooling &amp; consumables</h2><p class="hint">End mills, inserts, nuts and bolts. When something hits its minimum the manufacturing lead is pinged.</p></div><a class="secondary button-link" href="stock.html">All stock &amp; tools</a></div>
           <div class="table-wrap"><table><thead><tr><th>Item</th><th>Kind</th><th>Location</th><th>On hand</th><th>Order from</th><th></th></tr></thead><tbody id="mfg-stock-body"></tbody></table></div><p id="mfg-stock-empty" class="empty">No tooling or consumables yet.</p>
-          <form id="mfg-stock-form" class="form-grid"><label>Name<input name="name" required /></label><label>Kind<select name="kind"><option>Tooling</option><option>Consumable</option></select></label><label>Quantity<input name="qty" type="number" min="0" value="1" required /></label><label>Reorder at (min)<input name="minQty" type="number" min="0" /></label><label>Location / bin<input name="location" /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Vendor<select name="vendor" data-vendor-select></select></label><label>Order link<input name="orderUrl" type="url" /></label><label>Alternate vendor<input name="altVendor" /></label><label>Alternate order link<input name="altUrl" type="url" /></label><button>Add item</button></form></div>
+          <div class="mfg-add"><h3>Add tooling or a consumable</h3><form id="mfg-stock-form" class="form-grid"><label>Name<input name="name" required /></label><label>Kind<select name="kind"><option>Tooling</option><option>Consumable</option></select></label><label>Quantity<input name="qty" type="number" min="0" value="1" required /></label><label>Reorder at (min)<input name="minQty" type="number" min="0" /></label><label>Location / bin<input name="location" /></label><label>Unit cost ($)<input name="unitCost" type="number" min="0" step="0.01" /></label><label>Vendor<select name="vendor" data-vendor-select></select></label><label>Order link<input name="orderUrl" type="url" /></label><label>Alternate vendor<input name="altVendor" /></label><label>Alternate order link<input name="altUrl" type="url" /></label><button>Add item</button></form></div></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -62,7 +60,7 @@
     <script src="funds.js"></script>
     <script src="bugs.js"></script>
     <script src="design.js"></script>
-    <script src="events.js"></script>
+    <script src="boot.js"></script>
     <script src="ui.js"></script>
   </body>
 </html>

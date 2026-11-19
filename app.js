@@ -2,7 +2,7 @@ const KEYS = { parts: "motorsport-erp-parts", purchases: "motorsport-erp-purchas
 const $ = (selector) => document.querySelector(selector) || document.createElement("div");
 const onPage = (selector) => !!document.querySelector(selector);
 // One HTML file per section. Overview is index.html.
-const PAGE_FILES = { overview: "index.html", projects: "design.html", events: "events.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", approvals: "approvals.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", vendors: "vendors.html", budget: "budget.html", team: "team.html" };
+const PAGE_FILES = { overview: "index.html", projects: "design.html", parts: "parts.html", assembly: "assembly.html", documents: "documents.html", "machine-shop": "machine-shop.html", stock: "stock.html", testing: "testing.html", purchasing: "purchasing.html", vendors: "vendors.html", budget: "budget.html", team: "team.html" };
 // Hooks that ops.js (loaded after this file) plugs into.
 const EXT = { renders: [], seeds: [], can: [], before: [], after: [], inbox: [], projectExtras: [], rowButtons: [] };
 // Stages an item can't advance past (no wrapping back to the start).
@@ -68,7 +68,8 @@ function can(action, key, row) {
       if (row && row.status === "Quoted" && Number(row.amount) > PURCHASE_LEADERSHIP_LIMIT) return isLeader(u) && (isAdmin || !own(row));
       return has("Purchasing Approver") && (isAdmin || !own(row));
     case "delete:purchases": return has("Purchasing Approver") || (own(row) && row.status === "Requested");
-    case "advance:jobs": case "delete:jobs": return has("Shop Lead");
+    case "advance:jobs": return false; // the checklist sets job status (manufacturing.js)
+    case "delete:jobs": return has("Shop Lead");
     case "advance:approvals": return has("Design Review Approver") && (isAdmin || !own(row));
     case "delete:approvals": return leads(row?.subsystem) || (own(row) && row.status === "Pending Review");
     // Projects: anyone proposes; leadership or the subteam's lead approves (not their own); owner/lead/leadership run it.
@@ -362,7 +363,7 @@ function renderParts() {
   const query = ($("#part-search")?.value || "").trim().toLowerCase();
   const rows = read("parts").filter((part) => Object.values(part).join(" ").toLowerCase().includes(query));
   const shown = query ? rows : [];
-  $("#parts-body").innerHTML = shown.map((part) => `<tr><td class="mono">${esc(part.partNumber || "—")}</td><td>${esc(part.name)}</td><td>${(part.vehicles || []).map((v) => `<span class="pill">${esc(v)}</span>`).join(" ")}</td><td>${esc(part.system || "")}</td><td>${esc(part.assembly || "")}</td><td>${esc(part.quantity)}</td><td>${esc(part.location)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
+  $("#parts-body").innerHTML = shown.map((part) => `<tr><td class="mono">${esc(part.partNumber || "—")}</td><td>${esc(part.name)}</td><td>${(part.vehicles || []).map((v) => `<span class="pill">${esc(v)}</span>`).join(" ")}</td><td>${esc(part.system || "")}</td><td>${esc(part.assembly || "")}</td><td>${esc(part.quantity)}</td><td><span class="status">${esc(part.status)}</span></td><td>${actions("parts", part)}</td></tr>`).join("");
   $("#parts-search-table").classList.toggle("hidden", !shown.length);
   $("#parts-empty").textContent = query ? "No parts match." : "Type a part number, name or material to search every car.";
   $("#parts-empty").style.display = shown.length ? "none" : "block";
@@ -406,16 +407,14 @@ function renderTeam() {
 }
 function renderOverview() {
   const purchases = read("purchases"); const jobs = read("jobs"); const approvals = read("approvals"); const parts = read("parts"); const u = me();
-  $("#stats").innerHTML = [["Parts tracked", parts.length, "parts"], ["Open purchases", purchases.filter((x) => x.status !== "Received").length, "requests"], ["Shop queue", jobs.filter((x) => x.status !== "Complete").length, "jobs"], ["Pending approvals", approvals.filter((x) => x.status !== "Approved").length, "reviews"]].map(([label, value, suffix]) => `<div class="stat"><span>${label}</span><strong>${value}</strong><small>${suffix}</small></div>`).join("");
+  $("#stats").innerHTML = [["Parts tracked", parts.length, "parts"], ["Open purchases", purchases.filter((x) => x.status !== "Received").length, "requests"], ["Shop queue", jobs.filter((x) => x.status !== "Complete").length, "jobs"], ["Design gates in review", read("projects").filter((p) => p.review).length, "projects"]].map(([label, value, suffix]) => `<div class="stat"><span>${label}</span><strong>${value}</strong><small>${suffix}</small></div>`).join("");
   const projects = read("projects"); const projName = (pid) => projects.find((p) => p.id === pid)?.name || "?";
   const today = new Date().toISOString().slice(0, 10);
   const inbox = [
     ...EXT.inbox.flatMap((f) => f(u)),
     ...read("docs").filter((d) => d.status === "In Review" && can("advance", "docs", d)).map((d) => `Document: ${d.number} ${d.title} Rev ${d.revision} is ready to release`),
-    ...(isLeader(u) ? read("deliverables").filter((x) => x.dueDate && x.dueDate <= new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10) && read("docs").find((d) => d.id === x.docId)?.status !== "Released").map((x) => `Deliverable: ${x.name} ${x.dueDate < today ? "is overdue" : "is due " + x.dueDate}`) : []),
     ...read("tasks").filter((t) => t.assigneeId === u.id && t.status !== "Done").map((t) => `Task: ${t.title} (${projName(t.projectId)}) is ${t.status}${t.dueDate ? `, due ${t.dueDate}` : ""}`),
     ...purchases.filter((p) => p.status !== "Received" && can("advance", "purchases", p)).map((p) => `Purchase: ${p.item} (${money(p.amount)}) is ${p.status}`),
-    ...approvals.filter((a) => a.status !== "Approved" && can("advance", "approvals", a)).map((a) => `Design review: ${a.name} ${a.revision} is ${a.status}`),
     ...jobs.filter((j) => j.status !== "Complete" && can("advance", "jobs", j)).map((j) => `Shop job: ${j.name} is ${j.status}`)
   ];
   $("#my-queue-title").textContent = `Waiting on ${u.name}`;
@@ -690,7 +689,7 @@ function renderDocs() {
     if (d.status === "Released" && can("revise", "docs", d)) acts.push(`<button class="link" data-action="revise" data-key="docs" data-id="${d.id}">New rev</button>`);
     if (can("delete", "docs", d)) acts.push(`<button class="link danger" data-action="delete" data-key="docs" data-id="${d.id}">Delete</button>`);
     const hist = (d.history || []).map((h) => `${h.revision} ${h.status}`).join(" → ");
-    return `<tr><td class="mono">${esc(d.number)}</td><td><strong>${esc(d.title)}</strong>${hist ? `<div class="hint">History: ${esc(hist)}</div>` : ""}</td><td>${esc(d.type)}</td><td class="mono">${esc(d.revision)}</td><td>${esc(docLinkLabel(d))}</td><td>${esc(memberName(d.ownerId))}</td><td><span class="status doc-${stageClass(d.status)}">${esc(d.status)}</span></td><td class="mono">${esc((d.updatedAt || "").slice(0, 10))}</td><td>${acts.join("")}</td></tr>`;
+    return `<tr><td class="mono">${esc(d.number)}</td><td><strong>${esc(d.title)}</strong><div class="hint">${esc(d.type)} · ${esc(memberName(d.ownerId))}${hist ? ` · earlier: ${esc(hist)}` : ""}</div></td><td class="mono">${esc(d.revision)}</td><td><span class="status doc-${stageClass(d.status)}">${esc(d.status)}</span></td><td>${acts.join("")}</td></tr>`;
   }).join("");
   $("#docs-empty").style.display = docs.length ? "none" : "block";
   $("#docs-count").textContent = `${read("docs").length} documents`;
@@ -847,4 +846,4 @@ document.addEventListener("click", (event) => {
 
 ensureTeam();
 ensureDeliverables();
-// The first render happens at the end of events.js, once every module has registered its hooks.
+// The first render happens in boot.js, once every module has registered its hooks.

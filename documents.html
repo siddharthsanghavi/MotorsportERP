@@ -20,12 +20,10 @@
         <a class="tab" href="index.html"><span>Overview</span></a>
         <p class="nav-group">Plan</p>
         <a class="tab" href="design.html"><span>Design</span></a>
-        <a class="tab" href="events.html"><span>Events</span></a>
         <p class="nav-group">Engineering</p>
         <a class="tab" href="parts.html"><span>Parts</span></a>
         <a class="tab" href="assembly.html"><span>Assembly</span></a>
         <a class="tab active" href="documents.html" aria-current="page"><span>Documents</span></a>
-        <a class="tab" href="approvals.html"><span>Design reviews</span></a>
         <p class="nav-group">Shop & track</p>
         <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
         <a class="tab" href="stock.html"><span>Stock & tools</span></a>
@@ -41,24 +39,18 @@
       </nav>
 
       <section id="documents" class="view active">
-        <div class="card collapsible is-process collapsed"><div class="list-header"><div><h2>How it works: document control</h2></div><span class="hint">Highlighted arrows are steps you can take</span></div><div id="process-docs" class="flow short"></div></div>
-        <div class="card"><div class="list-header"><div><p class="eyebrow">COMPETITION</p><h2>Deliverables</h2></div><div id="deliverables-progress" class="progress-row deliv-progress"></div></div>
-          <p class="hint">Link each deliverable to its document. It counts as ready once that document is released. Set the due dates from this season's rules and event calendar.</p>
-          <div class="table-wrap"><table class="compact deliv-table"><thead><tr><th>Deliverable</th><th>Document</th><th>Due</th><th>State</th></tr></thead><tbody id="deliverables-body"></tbody></table></div></div>
         <div class="card"><p class="eyebrow">REGISTER</p><h2>Register a document</h2>
           <form id="doc-form" class="form-grid">
             <label>Title<input name="title" required placeholder="e.g. Rear rocker drawing" /></label>
             <label>Type<select name="type" id="doc-type"></select></label>
             <label>Revision<input name="revision" placeholder="A" /></label>
             <label>Subteam<select name="subteam" id="doc-subteam"></select></label>
-            <label>Part<select name="partId" id="doc-part"></select></label>
-            <label>Project<select name="projectId" id="doc-project"></select></label>
             <label class="wide">Link to file<input name="url" type="url" placeholder="https://drive.google.com/… or your PDM / OneDrive link" /></label>
             <button>Register document</button>
           </form>
         </div>
         <div class="card"><div class="list-header"><div><h2>Document register</h2></div><div class="filters"><span id="docs-count" class="pill"></span><select id="doc-filter-type"></select><input id="doc-search" type="search" placeholder="Search documents" /></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Number</th><th>Title</th><th>Type</th><th>Rev</th><th>Linked to</th><th>Owner</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody id="docs-body"></tbody></table></div><p id="docs-empty" class="empty">No documents match.</p></div>
+          <div class="table-wrap"><table><thead><tr><th>Number</th><th>Title</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody id="docs-body"></tbody></table></div><p id="docs-empty" class="empty">No documents match.</p></div>
       </section>
     </main>
     <div id="toast" class="toast" role="status"></div>
@@ -72,7 +64,7 @@
     <script src="funds.js"></script>
     <script src="bugs.js"></script>
     <script src="design.js"></script>
-    <script src="events.js"></script>
+    <script src="boot.js"></script>
     <script src="ui.js"></script>
   </body>
 </html>
