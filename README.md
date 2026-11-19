@@ -31,6 +31,7 @@ Pages share data through `localStorage`, which works across local files in Chrom
 - Demo controls: load realistic records across every module or clear the local workspace
 - Overview dashboard with counts, a "waiting on you" queue, and an audit log of who did what
 - Bug reports: the 🐞 button in the header on every page records the page, severity, steps and expected result. Admins triage them under Workspace ▾ → Bug reports (status, CSV export, open as a GitHub issue) and reporters are notified when theirs is fixed.
-- Guide (last tab): how to use each page.
+- Guide: how to use each page.
+- Roadmap (last tab): what's planned, phase by phase.
 
 The maps load React and React Flow from unpkg on demand, so they need an internet connection; QR labels use qrcode-generator from cdnjs. Everything else works offline.

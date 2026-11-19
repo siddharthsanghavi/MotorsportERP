@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roadmap · MotorsportERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="guide">
+    <main class="container">
+      <header class="hero">
+        <div><p class="eyebrow">FSAE TEAM OPERATIONS</p><h1>MotorsportERP</h1><p>2026 season · parts, projects, shop, events and money in one place.</p></div>
+        <div class="hero-actions"><div class="user-box"><label class="inline">Acting as <select id="user-select"></select></label><div id="user-roles" class="roles"></div></div><div class="bell-wrap"><button class="ghost bell" id="bell" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel" class="bell-panel hidden"></div></div>
+          <details class="menu"><summary class="ghost">Workspace ▾</summary><div class="menu-panel"><button class="secondary" id="seed-data">Load demo data</button><button class="secondary" id="backup-export">Download backup</button><button class="secondary" id="backup-import">Restore backup…</button><input type="file" id="backup-file" accept=".json,application/json" hidden /><small id="backup-hint"></small><hr /><button class="ghost danger-text" id="clear-data">Clear workspace</button></div></details></div>
+      </header>
+
+      <nav class="tabs" aria-label="Main navigation">
+        <a class="tab" href="index.html"><span>Overview</span></a>
+        <p class="nav-group">Plan</p>
+        <a class="tab" href="design.html"><span>Design</span></a>
+        <p class="nav-group">Engineering</p>
+        <a class="tab" href="parts.html"><span>Parts</span></a>
+        <a class="tab" href="assembly.html"><span>Assembly</span></a>
+        <a class="tab" href="documents.html"><span>Documents</span></a>
+        <p class="nav-group">Shop & track</p>
+        <a class="tab" href="machine-shop.html"><span>Manufacturing</span></a>
+        <a class="tab" href="stock.html"><span>Stock & tools</span></a>
+        <a class="tab" href="testing.html"><span>Testing</span></a>
+        <p class="nav-group">Money</p>
+        <a class="tab" href="purchasing.html"><span>Purchasing</span></a>
+        <a class="tab" href="vendors.html"><span>Vendors</span></a>
+        <a class="tab" href="budget.html"><span>Budget</span></a>
+        <p class="nav-group">People</p>
+        <a class="tab" href="team.html"><span>Team</span></a>
+        <p class="nav-group">Help</p>
+        <a class="tab" href="guide.html"><span>Guide</span></a>
+        <a class="tab active" href="roadmap.html" aria-current="page"><span>Roadmap</span></a>
+      </nav>
+
+      <section id="roadmap" class="view active">
+        <div class="card"><h2>Roadmap</h2><p class="hint">What's planned next. Every phase connects parts to more of the app so a part's whole story is in one place. Have an idea? Use 🐞 Report a bug and say it's a request.</p></div>
+        <div class="card guide-card"><div class="list-header"><h2>Phase 1 · Part record as the hub</h2><span class="status">Next</span></div><ul><li>Part statuses: In Design → Manufacturing → Ordered → In Inventory → Installed → Retired.</li><li>A part page that shows everything linked to it: project, drawings, jobs, purchases, spares, test history.</li><li>Responsible engineer on each part (defaults to the project POC) who gets part-update notifications.</li></ul></div>
+        <div class="card guide-card"><div class="list-header"><h2>Phase 2 · Design flows into purchasing or manufacturing</h2><span class="status">Planned</span></div><ul><li>Design projects list the parts they own; PP1 creates them as In Design.</li><li>Each part is marked <b>Make</b> or <b>Buy</b> during design.</li><li>Passing PP3 sends every part on: <b>Make</b> parts become machining requests in Manufacturing, <b>Buy</b> parts become purchase requests in Purchasing (pre-filled with the vendor, budget and project).</li><li>Released drawings show on the part; a machining job can't pass CAM approval without one.</li></ul></div>
+        <div class="card guide-card"><div class="list-header"><h2>Phase 3 · Making and buying update parts</h2><span class="status">Planned</span></div><ul><li>Finishing the manufacturing checklist sets the part to In Inventory (middle red cabinet).</li><li>Receiving a purchase sets its part to In Inventory; the part shows open and past orders.</li><li>Tooling used on a job counts down stock automatically.</li></ul></div>
+        <div class="card guide-card"><div class="list-header"><h2>Phase 4 · Money and spares</h2><span class="status">Planned</span></div><ul><li>Actual spend per part, assembly and system, rolled up from purchases and funds (no typed-in costs).</li><li>Spares in stock link to their part number; low spares ping the responsible engineer.</li></ul></div>
+        <div class="card guide-card"><div class="list-header"><h2>Phase 5 · Testing closes the loop</h2><span class="status">Planned</span></div><ul><li>The car log knows which parts are installed on that car; km are added per part.</li><li>Issues in the conclusion can be tagged to a part and become a task on its project.</li><li>Import an MCAP CSV export of logged data into the session info.</li></ul></div>
+        <div class="card guide-card"><div class="list-header"><h2>Later</h2><span class="status">Ideas</span></div><ul><li>Data flow diagram of the whole app (React Flow) on this page.</li><li>Bring back part life tracking and a failure log once parts are linked.</li><li>Shared storage so the team works from one dataset instead of each browser.</li></ul></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <dialog id="editor" class="editor"></dialog>
+    <script src="app.js"></script>
+    <script src="ops.js"></script>
+    <script src="vendors.js"></script>
+    <script src="vehicles.js"></script>
+    <script src="manufacturing.js"></script>
+    <script src="carlog.js"></script>
+    <script src="funds.js"></script>
+    <script src="bugs.js"></script>
+    <script src="design.js"></script>
+    <script src="boot.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>
